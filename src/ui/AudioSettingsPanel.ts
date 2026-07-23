@@ -17,6 +17,7 @@ export interface AudioSettingsPanelConfig {
   x: number
   y: number
   onClose: () => void
+  baseDepth?: number
 }
 
 export class AudioSettingsPanel {
@@ -48,6 +49,7 @@ export class AudioSettingsPanel {
   constructor(scene: Phaser.Scene, config: AudioSettingsPanelConfig) {
     this.scene = scene
     this.onClose = config.onClose
+    const baseDepth = config.baseDepth ?? 0
 
     const panelWidth = CONFIG.ui.audioPanel.width
     const panelHeight = CONFIG.ui.audioPanel.height
@@ -57,11 +59,11 @@ export class AudioSettingsPanel {
 
     const dimmer = scene.add
       .rectangle(config.x, config.y, CONFIG.screen.width, CONFIG.screen.height, 0x000000, 0.42)
-      .setDepth(PANEL_DEPTH.dimmer)
+      .setDepth(baseDepth + PANEL_DEPTH.dimmer)
     const panelBg = scene.add
       .rectangle(config.x, config.y, panelWidth, panelHeight, CONFIG.ui.audioPanel.panelColor, 0.98)
       .setStrokeStyle(CONFIG.ui.buttonDefaults.borderThickness, CONFIG.world.accentColor, 0.65)
-      .setDepth(PANEL_DEPTH.panel)
+      .setDepth(baseDepth + PANEL_DEPTH.panel)
 
     this.rootObjects.push(dimmer, panelBg)
 
@@ -76,26 +78,26 @@ export class AudioSettingsPanel {
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(PANEL_DEPTH.text)
+      .setDepth(baseDepth + PANEL_DEPTH.text)
     const muteLabel = scene.add
       .text(this.panel.x + CONFIG.ui.audioPanel.marginX, top + 72, 'Mute', {
         color: CONFIG.ui.audioPanel.valueColor,
         fontSize: CONFIG.ui.audioPanel.labelFontSize,
       })
-      .setDepth(PANEL_DEPTH.text)
+      .setDepth(baseDepth + PANEL_DEPTH.text)
     const soundLabel = scene.add
       .text(this.panel.x + CONFIG.ui.audioPanel.marginX, top + 132, 'Sound Volume', {
         color: CONFIG.ui.audioPanel.valueColor,
         fontSize: CONFIG.ui.audioPanel.labelFontSize,
       })
-      .setDepth(PANEL_DEPTH.text)
+      .setDepth(baseDepth + PANEL_DEPTH.text)
     this.valueText = scene.add
       .text(this.panel.x + panelWidth - CONFIG.ui.audioPanel.marginX, top + 132, '', {
         color: CONFIG.ui.audioPanel.valueColor,
         fontSize: CONFIG.ui.audioPanel.valueFontSize,
       })
       .setOrigin(1, 0)
-      .setDepth(PANEL_DEPTH.text)
+      .setDepth(baseDepth + PANEL_DEPTH.text)
 
     this.rootObjects.push(title, muteLabel, soundLabel, this.valueText)
 
@@ -108,15 +110,15 @@ export class AudioSettingsPanel {
         CONFIG.ui.audioPanel.trackColor,
         1,
       )
-      .setDepth(PANEL_DEPTH.slider)
+      .setDepth(baseDepth + PANEL_DEPTH.slider)
     this.volumeFill = scene.add
       .rectangle(this.sliderLeftX, top + 160, 0, CONFIG.ui.audioPanel.trackHeight, CONFIG.ui.audioPanel.fillColor, 1)
       .setOrigin(0, 0.5)
-      .setDepth(PANEL_DEPTH.slider)
+      .setDepth(baseDepth + PANEL_DEPTH.slider)
     this.volumeThumb = scene.add
       .rectangle(this.sliderLeftX, top + 160, CONFIG.ui.audioPanel.thumbSize, CONFIG.ui.audioPanel.thumbSize, CONFIG.ui.audioPanel.thumbColor, 1)
       .setOrigin(0.5)
-      .setDepth(PANEL_DEPTH.slider)
+      .setDepth(baseDepth + PANEL_DEPTH.slider)
 
     this.rootObjects.push(this.volumeTrack, this.volumeFill, this.volumeThumb)
 
@@ -125,7 +127,7 @@ export class AudioSettingsPanel {
       y: top + 96,
       width: 140,
       text: 'Mute',
-      depth: PANEL_DEPTH.button,
+      depth: baseDepth + PANEL_DEPTH.button,
       onActivate: () => {
         const current = getAudioSettings()
         const nextMuted = !current.muted
@@ -139,7 +141,7 @@ export class AudioSettingsPanel {
       width: CONFIG.ui.audioPanel.closeButtonWidth,
       height: CONFIG.ui.audioPanel.closeButtonHeight,
       text: 'Back',
-      depth: PANEL_DEPTH.button,
+      depth: baseDepth + PANEL_DEPTH.button,
       onActivate: () => this.close(),
     })
 

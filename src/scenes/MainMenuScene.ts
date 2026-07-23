@@ -62,6 +62,7 @@ export default class MainMenuScene extends Phaser.Scene {
   create(): void {
     this.game.canvas.dataset.scene = 'main-menu'
     delete this.game.canvas.dataset.overlay
+    delete this.game.canvas.dataset.runId
     this.input.keyboard?.on('keydown-ESC', this.onEscape)
     this.input.keyboard?.on('keydown-TAB', this.onNavigate)
     this.input.keyboard?.on('keydown-LEFT', this.onNavigate)

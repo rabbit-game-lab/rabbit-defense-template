@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
+import { createSceneButton } from '../ui/createSceneButton'
+import { PauseMenuController, type PauseOverlayMarker } from '../ui/PauseMenuController'
 import type { HudState } from './GameScene'
 
 interface GameSceneBridge {
@@ -43,6 +45,7 @@ export default class UIScene extends Phaser.Scene {
   private resultPanel: ResultPanel | null = null
   private hasShownResult = false
   private replayedCurrentRun = false
+  private pauseMenuController!: PauseMenuController
 
   constructor() {
     super('UIScene')
@@ -132,6 +135,26 @@ export default class UIScene extends Phaser.Scene {
     this.setButtonEnabled(this.upgradeButton, false)
     this.setButtonEnabled(this.sellButton, false)
     this.onboardingPanel.skipButton.bg.setVisible(false)
+
+    let pauseController: PauseMenuController | undefined
+    const pauseButton = createSceneButton(this, {
+      x: CONFIG.ui.pauseMenu.buttonX,
+      y: CONFIG.ui.pauseMenu.buttonY,
+      width: CONFIG.ui.pauseMenu.buttonSize,
+      height: CONFIG.ui.pauseMenu.buttonSize,
+      text: 'Ⅱ',
+      depth: CONFIG.ui.pauseMenu.depth - 1,
+      onActivate: () => pauseController?.activatePauseButton(),
+    })
+    const setOverlayMarker = (marker: PauseOverlayMarker): void => {
+      if (marker) {
+        this.game.canvas.dataset.overlay = marker
+      } else {
+        delete this.game.canvas.dataset.overlay
+      }
+    }
+    pauseController = new PauseMenuController({ scene: this, pauseButton, onOverlayMarker: setOverlayMarker })
+    this.pauseMenuController = pauseController
   }
 
   update(): void {
@@ -139,6 +162,7 @@ export default class UIScene extends Phaser.Scene {
     if (!game) return
 
     const hud = game.getHudState()
+    this.pauseMenuController.setEnabled(!hud.result)
 
     this.statsLine.setText(`Ryo ${hud.coins}   Dojo HP ${hud.lives}`)
     this.waveLine.setText(hud.waveLabel)
