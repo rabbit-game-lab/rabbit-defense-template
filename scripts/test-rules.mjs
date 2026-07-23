@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   advanceEnemyAlongPath,
   canAffordTower,
@@ -83,6 +84,20 @@ import {
   setSoundVolume,
 } from '../.tmp-tests/src/systems/audioManager.js'
 import { initializePersistedAudioSettings } from '../.tmp-tests/src/systems/audioStartup.js'
+import {
+  clampAudioPercent,
+  formatBestProfileResult,
+  resolvePanelFillPercent,
+  sliderGeometryFromPanel,
+} from '../.tmp-tests/src/ui/audioSettingsPanelRules.js'
+import {
+  EXPECTED_SCENE_ORDER,
+  resolveBootNextScene,
+  resolveMenuEscapeAction,
+  resolveMenuOptionsAction,
+  resolveMenuStartAction,
+  isRestartSceneConfigured,
+} from '../.tmp-tests/src/scenes/flowContracts.js'
 
 import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
 import {
@@ -103,6 +118,56 @@ const path = [
   { x: 100, y: 0 },
   { x: 100, y: 100 },
 ]
+
+assert.equal(clampAudioPercent(Number.NaN), 0, 'invalid audio percent falls back safely')
+assert.equal(clampAudioPercent(-12), 0, 'audio percent clamps at zero')
+assert.equal(clampAudioPercent(33.6), 34, 'audio percent rounds for a stable UI label')
+assert.equal(clampAudioPercent(140), 100, 'audio percent clamps at one hundred')
+const sliderGeometry = sliderGeometryFromPanel(80, 640)
+assert.deepEqual(sliderGeometry, { leftX: 112, width: 576 }, 'slider respects panel margins')
+assert.deepEqual(
+  resolvePanelFillPercent(25, sliderGeometry),
+  { percent: 25, fillPercent: 0.25, thumbX: 256, label: '25%' },
+  'slider fill, thumb and label share one normalized value',
+)
+assert.equal(
+  formatBestProfileResult(12, 345, 90_000),
+  'Best Dojo HP 12  Best Ryo 345  Fastest 90s',
+  'menu profile summary uses ninja-facing labels',
+)
+assert.deepEqual(EXPECTED_SCENE_ORDER, ['BootScene', 'MainMenuScene', 'GameScene', 'UIScene'])
+assert.deepEqual(resolveBootNextScene(false), { type: 'wait' })
+assert.deepEqual(resolveBootNextScene(true), { type: 'start', nextScene: 'MainMenuScene' })
+assert.equal(resolveMenuStartAction({ isStarting: false, optionsOpen: false }), 'start')
+assert.equal(resolveMenuStartAction({ isStarting: true, optionsOpen: false }), 'block-already-starting')
+assert.equal(resolveMenuStartAction({ isStarting: false, optionsOpen: true }), 'block-options-open')
+assert.equal(resolveMenuStartAction({ isStarting: false, optionsOpen: false, gameSceneActive: true }), 'block-game-active')
+assert.equal(resolveMenuOptionsAction({ isStarting: false, optionsOpen: false }), 'open')
+assert.equal(resolveMenuOptionsAction({ isStarting: false, optionsOpen: true }), 'already-open')
+assert.equal(resolveMenuOptionsAction({ isStarting: true, optionsOpen: false }), 'block-starting')
+assert.equal(resolveMenuEscapeAction({ optionsOpen: true }), 'close-options')
+assert.equal(resolveMenuEscapeAction({ optionsOpen: false }), 'ignore')
+assert.equal(isRestartSceneConfigured('MainMenuScene'), true)
+assert.equal(isRestartSceneConfigured('GameScene'), false)
+
+const sceneRegistrySource = readFileSync('src/scenes/index.ts', 'utf8')
+const bootSceneSource = readFileSync('src/scenes/BootScene.ts', 'utf8')
+const menuSceneSource = readFileSync('src/scenes/MainMenuScene.ts', 'utf8')
+const gameSceneSource = readFileSync('src/scenes/GameScene.ts', 'utf8')
+const sceneButtonSource = readFileSync('src/ui/createSceneButton.ts', 'utf8')
+const audioPanelSource = readFileSync('src/ui/AudioSettingsPanel.ts', 'utf8')
+assert.match(sceneRegistrySource, /\[BootScene, MainMenuScene, GameScene, UIScene\]/)
+assert.match(sceneRegistrySource, /RESTART_SCENE_KEY = 'MainMenuScene'/)
+assert.match(bootSceneSource, /resolveBootNextScene\(true\)/)
+assert.match(menuSceneSource, /new AudioSettingsPanel/)
+assert.match(menuSceneSource, /keydown-TAB/)
+assert.match(menuSceneSource, /setMenuFocus/)
+assert.match(menuSceneSource, /dataset\.scene = 'main-menu'/)
+assert.match(menuSceneSource, /dataset\.overlay = 'audio-options'/)
+assert.match(gameSceneSource, /dataset\.scene = 'game'/)
+assert.match(sceneButtonSource, /minTouchablePx/)
+assert.match(sceneButtonSource, /depth\?: number/)
+assert.match(audioPanelSource, /PANEL_DEPTH/)
 
 const balanceStrategies = createBaselineStrategies()
 assert.deepEqual(

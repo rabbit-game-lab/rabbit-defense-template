@@ -77,6 +77,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.game.canvas.dataset.scene = 'game'
+    delete this.game.canvas.dataset.overlay
     const sessionId = ++GameScene.nextRunId
 
     this.runState = createRunState(this.time.now)
