@@ -5,7 +5,7 @@ import { createWaveState, prepareFirstWaveForCombat, nextEnemyToSpawn, markEnemy
 import { type SimWaveMetrics, type StrategyContext, type StrategyAction, type TowerRuntimeSummary } from './balanceTypes.js'
 
 export const STEP_MS = 20
-export const MAX_SIM_TIME_MS = 240_000
+export const MAX_SIM_TIME_MS = 420_000
 
 export interface TowerRuntime {
   id: string
@@ -31,6 +31,7 @@ export interface EnemyRuntime {
   reward: number
   speed: number
   leakDamage: number
+  slowResistance: number
   wave: number
   pathIndex: number
   progress: number
@@ -67,6 +68,7 @@ export interface SimState {
   towerCounter: number
   totalKills: number
   totalLeaks: number
+  totalSpawned: number
 }
 
 export function createSimulationState(): SimState {
@@ -93,6 +95,7 @@ export function createSimulationState(): SimState {
     towerCounter: 0,
     totalKills: 0,
     totalLeaks: 0,
+    totalSpawned: 0,
   }
 }
 
@@ -208,9 +211,11 @@ export function spawnEnemyIfDue(state: SimState): void {
     y: PATH[0].y,
     slowFactor: 1,
     slowUntil: 0,
+    slowResistance: def.slowResistance,
     alive: true,
     escaped: false,
   })
+  state.totalSpawned += 1
   markEnemySpawned(state.waveState, state.now)
 }
 
@@ -251,7 +256,12 @@ export function impactProjectiles(state: SimState): void {
 
       for (const enemy of victims) {
         const result = damageEnemy(
-          { hp: enemy.hp, slowFactor: enemy.slowFactor, slowUntil: enemy.slowUntil },
+          {
+            hp: enemy.hp,
+            slowFactor: enemy.slowFactor,
+            slowUntil: enemy.slowUntil,
+            slowResistance: enemy.slowResistance,
+          },
           projectile.damage,
           state.now,
           projectile.slowFactor,

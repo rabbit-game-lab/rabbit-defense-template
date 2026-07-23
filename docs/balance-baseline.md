@@ -3,29 +3,50 @@
 - Simulator assumptions: deterministic wave/state progression, fixed 20ms tick, no randomness, no API/input dependence.
 - The model reuses real tower/enemy/wave definitions and pure combat rules, but remains comparative rather than a pixel-perfect Phaser replay.
 - Action policy: baseline strategies only (place/upgrade), one action per tick, sorted stable targets, max three upgrade levels.
-- Decision: all four legal baselines clear the five introductory waves with 15 lives, so PR #5 makes no gameplay tuning change; harder expansion is evaluated separately.
+- Campaign envelope: 3/4 legal baselines win across 10 waves; at least two winners are required.
+- Product decision: the strategy spread is covered by the existing three towers and current map, so no fourth tower or additional map is added in this PR.
 
-- Arrow + Frost: VICTORY | coins 195 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 6
+- Arrow + Frost: DEFEAT | coins 515 | lives 0 | kills 41 | leaks 8 | spawned 54 | waves 9/10 | purchases 6
   - Wave 1: buys 2, kills 4, leaks 0, Δcoins -61, Δlives 0
-  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -15, Δlives 0
-  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 8, Δlives 0
-  - Wave 4: buys 0, kills 6, leaks 0, Δcoins 67, Δlives 0
-  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 116, Δlives 0
-- Arrow + Bombard: VICTORY | coins 170 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 6
+  - Wave 2: buys 0, kills 5, leaks 0, Δcoins 29, Δlives 0
+  - Wave 3: buys 2, kills 5, leaks 0, Δcoins -36, Δlives 0
+  - Wave 4: buys 0, kills 6, leaks 0, Δcoins 41, Δlives 0
+  - Wave 5: buys 2, kills 7, leaks 0, Δcoins -48, Δlives 0
+  - Wave 6: buys 0, kills 5, leaks 2, Δcoins 130, Δlives 0
+  - Wave 7: buys 0, kills 3, leaks 3, Δcoins 91, Δlives 0
+  - Wave 8: buys 0, kills 4, leaks 2, Δcoins 107, Δlives 0
+  - Wave 9: buys 0, kills 2, leaks 1, Δcoins 55, Δlives 0
+  - Wave 10: buys 0, kills 0, leaks 0, Δcoins 127, Δlives -15
+- Arrow + Bombard: VICTORY | coins 1083 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 6
   - Wave 1: buys 1, kills 4, leaks 0, Δcoins 9, Δlives 0
-  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -55, Δlives 0
-  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 8, Δlives 0
-  - Wave 4: buys 1, kills 6, leaks 0, Δcoins 27, Δlives 0
-  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 101, Δlives 0
-- Arrow upgrades: VICTORY | coins 110 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 8
+  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -53, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 6, Δlives 0
+  - Wave 4: buys 2, kills 6, leaks 0, Δcoins -39, Δlives 0
+  - Wave 5: buys 1, kills 7, leaks 0, Δcoins 41, Δlives 0
+  - Wave 6: buys 0, kills 7, leaks 0, Δcoins 166, Δlives 0
+  - Wave 7: buys 0, kills 6, leaks 0, Δcoins 148, Δlives 0
+  - Wave 8: buys 0, kills 7, leaks 0, Δcoins 171, Δlives 0
+  - Wave 9: buys 0, kills 6, leaks 0, Δcoins 172, Δlives 0
+  - Wave 10: buys 0, kills 1, leaks 0, Δcoins 382, Δlives 0
+- Arrow upgrades: VICTORY | coins 940 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 9
   - Wave 1: buys 2, kills 4, leaks 0, Δcoins -41, Δlives 0
-  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -10, Δlives 0
-  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 23, Δlives 0
-  - Wave 4: buys 2, kills 6, leaks 0, Δcoins -43, Δlives 0
-  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 101, Δlives 0
-- Balanced: VICTORY | coins 45 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 8
+  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -8, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 21, Δlives 0
+  - Wave 4: buys 1, kills 6, leaks 0, Δcoins -3, Δlives 0
+  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 1, Δlives 0
+  - Wave 6: buys 2, kills 7, leaks 0, Δcoins 17, Δlives 0
+  - Wave 7: buys 0, kills 6, leaks 0, Δcoins 171, Δlives 0
+  - Wave 8: buys 0, kills 7, leaks 0, Δcoins 148, Δlives 0
+  - Wave 9: buys 0, kills 6, leaks 0, Δcoins 145, Δlives 0
+  - Wave 10: buys 0, kills 1, leaks 0, Δcoins 409, Δlives 0
+- Balanced: VICTORY | coins 875 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 9
   - Wave 1: buys 2, kills 4, leaks 0, Δcoins -61, Δlives 0
-  - Wave 2: buys 0, kills 5, leaks 0, Δcoins 40, Δlives 0
-  - Wave 3: buys 1, kills 5, leaks 0, Δcoins -47, Δlives 0
+  - Wave 2: buys 0, kills 5, leaks 0, Δcoins 29, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins -36, Δlives 0
   - Wave 4: buys 1, kills 6, leaks 0, Δcoins 1, Δlives 0
-  - Wave 5: buys 4, kills 7, leaks 0, Δcoins 32, Δlives 0
+  - Wave 5: buys 1, kills 7, leaks 0, Δcoins 20, Δlives 0
+  - Wave 6: buys 1, kills 7, leaks 0, Δcoins -2, Δlives 0
+  - Wave 7: buys 1, kills 6, leaks 0, Δcoins 0, Δlives 0
+  - Wave 8: buys 2, kills 7, leaks 0, Δcoins 69, Δlives 0
+  - Wave 9: buys 0, kills 6, leaks 0, Δcoins 144, Δlives 0
+  - Wave 10: buys 0, kills 1, leaks 0, Δcoins 631, Δlives 0

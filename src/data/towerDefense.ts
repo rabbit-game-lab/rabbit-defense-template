@@ -1,7 +1,7 @@
 import type { Point } from '../systems/towerDefenseRules'
 
 export type TowerType = 'arrow' | 'frost' | 'bomb'
-export type EnemyType = 'grunt' | 'runner' | 'tank'
+export type EnemyType = 'grunt' | 'runner' | 'tank' | 'warden'
 
 export interface TowerDefinition {
   type: TowerType
@@ -31,6 +31,7 @@ export interface EnemyDefinition {
   color: number
   trimColor: number
   radius: number
+  slowResistance: number
 }
 
 export interface WaveDefinition {
@@ -110,39 +111,54 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
 
 export const ENEMIES: Record<EnemyType, EnemyDefinition> = {
   grunt: {
-    type: 'grunt',
-    name: 'Goblin',
-    hp: 26,
-    speed: 46,
-    reward: 9,
-    leakDamage: 1,
-    color: 0x5f9f45,
-    trimColor: 0x20351d,
-    radius: 12,
-  },
+   type: 'grunt',
+   name: 'Goblin',
+   hp: 26,
+   speed: 46,
+   reward: 9,
+   leakDamage: 1,
+   color: 0x5f9f45,
+   trimColor: 0x20351d,
+   radius: 12,
+   slowResistance: 0,
+ },
   runner: {
-    type: 'runner',
-    name: 'Imp Runner',
-    hp: 16,
-    speed: 72,
-    reward: 11,
-    leakDamage: 1,
-    color: 0xb95f33,
-    trimColor: 0x3a1d13,
-    radius: 10,
-  },
+   type: 'runner',
+   name: 'Imp Runner',
+   hp: 16,
+   speed: 72,
+   reward: 11,
+   leakDamage: 1,
+   color: 0xb95f33,
+   trimColor: 0x3a1d13,
+   radius: 10,
+   slowResistance: 0,
+ },
   tank: {
-    type: 'tank',
-    name: 'Ogre',
-    hp: 72,
-    speed: 31,
-    reward: 22,
-    leakDamage: 2,
-    color: 0x6f6277,
-    trimColor: 0x2c2630,
-    radius: 15,
-  },
-}
+   type: 'tank',
+   name: 'Ogre',
+   hp: 72,
+   speed: 31,
+   reward: 22,
+   leakDamage: 2,
+   color: 0x6f6277,
+   trimColor: 0x2c2630,
+   radius: 15,
+   slowResistance: 0,
+ },
+ warden: {
+   type: 'warden',
+   name: 'Fortress Beetle',
+   hp: 220,
+   speed: 24,
+   reward: 160,
+   leakDamage: 4,
+   color: 0x6e4f2f,
+   trimColor: 0x2d1f13,
+   radius: 22,
+   slowResistance: 1,
+ },
+ }
 
 export const WAVES: readonly WaveDefinition[] = [
   { enemies: ['grunt', 'grunt', 'grunt', 'runner'], spawnEveryMs: 920 },
@@ -150,4 +166,9 @@ export const WAVES: readonly WaveDefinition[] = [
   { enemies: ['runner', 'runner', 'grunt', 'grunt', 'tank'], spawnEveryMs: 780 },
   { enemies: ['grunt', 'tank', 'runner', 'grunt', 'runner', 'tank'], spawnEveryMs: 740 },
   { enemies: ['tank', 'grunt', 'runner', 'tank', 'runner', 'grunt', 'tank'], spawnEveryMs: 700 },
+  { enemies: ['grunt', 'runner', 'tank', 'grunt', 'tank', 'runner', 'runner'], spawnEveryMs: 680 },
+  { enemies: ['tank', 'runner', 'runner', 'tank', 'grunt', 'tank'], spawnEveryMs: 660 },
+  { enemies: ['runner', 'tank', 'tank', 'runner', 'grunt', 'runner', 'tank'], spawnEveryMs: 620 },
+  { enemies: ['tank', 'runner', 'tank', 'tank', 'runner', 'runner'], spawnEveryMs: 640 },
+  { enemies: ['warden'], spawnEveryMs: 900 },
 ]
