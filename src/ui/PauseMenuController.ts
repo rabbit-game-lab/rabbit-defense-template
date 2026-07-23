@@ -19,12 +19,14 @@ interface PauseMenuControllerConfig {
   scene: Phaser.Scene
   pauseButton: SceneButtonHandle
   onOverlayMarker: (overlay: PauseOverlayMarker) => void
+  onModalChange?: (open: boolean) => void
 }
 
 export class PauseMenuController {
   private readonly scene: Phaser.Scene
   private readonly pauseButton: SceneButtonHandle
   private readonly onOverlayMarker: (overlay: PauseOverlayMarker) => void
+  private readonly onModalChange?: (open: boolean) => void
 
   private state: PauseMenuState = 'running'
   private overlayObjects: Phaser.GameObjects.GameObject[] = []
@@ -40,9 +42,10 @@ export class PauseMenuController {
     this.scene = config.scene
     this.pauseButton = config.pauseButton
     this.onOverlayMarker = config.onOverlayMarker
+    this.onModalChange = config.onModalChange
 
     this.pauseButton.setEnabled(true)
-    this.pauseButton.setKeyboardFocus(true)
+    this.pauseButton.setKeyboardFocus(false)
     this.scene.input.keyboard?.on('keydown-ESC', this.onPauseToggle)
     this.scene.input.keyboard?.on('keydown-P', this.onPauseToggle)
     this.scene.input.keyboard?.on('keydown-M', this.onMuteToggle)
@@ -62,7 +65,11 @@ export class PauseMenuController {
     this.isEnabled = enabled
     if (!enabled && this.state !== 'running') this.forceResume()
     this.pauseButton.setEnabled(enabled && this.state === 'running')
-    this.pauseButton.setKeyboardFocus(enabled && this.state === 'running')
+    this.pauseButton.setKeyboardFocus(false)
+  }
+
+  public isModalOpen(): boolean {
+    return this.state !== 'running'
   }
 
   public destroy = (): void => {
@@ -84,6 +91,8 @@ export class PauseMenuController {
 
   private readonly onPauseToggle = (): void => {
     if (!this.isEnabled || this.isTransitioning) return
+    const gameScene = this.getGameScene() as (Phaser.Scene & { cancelPlacement?: () => boolean }) | null
+    if (gameScene?.cancelPlacement?.()) return
     this.transition('toggle-pause')
   }
 
@@ -130,14 +139,15 @@ export class PauseMenuController {
     }
     if (effect === 'restart-run') {
       this.beginSceneTransition(() => {
-        gameScene?.scene.restart()
-        this.scene.scene.restart()
+        const manager = this.scene.game.scene
+        manager.stop(this.scene.scene.key)
+        manager.stop(GAME_SCENE_KEY)
+        window.setTimeout(() => manager.start(GAME_SCENE_KEY), 0)
       })
       return
     }
     if (effect === 'go-main-menu') {
       this.beginSceneTransition(() => {
-        gameScene?.scene.stop()
         this.scene.scene.start(MAIN_MENU_SCENE_KEY)
       })
     }
@@ -147,13 +157,13 @@ export class PauseMenuController {
     this.isTransitioning = true
     this.destroyOverlay()
     this.setMarker(null)
-    this.scene.time.delayedCall(0, execute)
+    window.setTimeout(execute, 80)
   }
 
   private render(): void {
     this.destroyOverlay()
     this.pauseButton.setEnabled(this.isEnabled && this.state === 'running')
-    this.pauseButton.setKeyboardFocus(this.isEnabled && this.state === 'running')
+    this.pauseButton.setKeyboardFocus(false)
 
     if (this.state === 'running') {
       this.setMarker(null)
@@ -271,7 +281,14 @@ export class PauseMenuController {
           0x000000,
           0.48,
         )
-        .setDepth(cfg.depth),
+        .setDepth(cfg.depth)
+        .setInteractive()
+        .on('pointerdown', (
+          _pointer: Phaser.Input.Pointer,
+          _localX: number,
+          _localY: number,
+          event: Phaser.Types.Input.EventData,
+        ) => event.stopPropagation()),
       this.scene.add
         .rectangle(CONFIG.screen.width / 2, CONFIG.screen.height / 2, width, height, cfg.panelColor, 0.98)
         .setStrokeStyle(1, CONFIG.world.accentColor, 0.7)
@@ -319,6 +336,7 @@ export class PauseMenuController {
   }
 
   private setMarker(marker: PauseOverlayMarker): void {
+    this.onModalChange?.(marker !== null)
     this.onOverlayMarker(marker)
   }
 

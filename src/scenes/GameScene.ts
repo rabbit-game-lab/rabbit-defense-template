@@ -26,13 +26,16 @@ import { loadProfile, markOnboardingComplete, updateProfile } from '../systems/p
 import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
 import {
-  createTimedHudMessage,
   formatWaveHud,
   getRunFallbackStatus,
-  resolveHudStatus,
-  type TimedHudMessage,
+  resolveFeedbackStatus,
+  updateHudFeedback,
+  type FeedbackLane,
+  type HudFeedback,
 } from '../systems/hudRules'
 import type { WaveProgressSnapshot } from '../systems/waves'
+import type { TowerType } from '../data/towerDefense'
+import { announceHpLoss, announcePlacement, announceRaid, announceResult } from '../accessibility/liveAnnouncements'
 
 export interface HudState {
   coins: number
@@ -44,6 +47,7 @@ export interface HudState {
   activeEnemies: number
   nextWaveInMs: number
   selectedTower: TowerPlacementSnapshot['selectedTower']
+  placement: TowerPlacementSnapshot
   status: string
   onboardingStep: OnboardingStep
   onboardingInstruction: string
@@ -58,8 +62,7 @@ export default class GameScene extends Phaser.Scene {
 
   private coins = CONFIG.run.startingCoins
   private lives: number = CONFIG.run.startingLives
-  private placementMessage: TimedHudMessage | undefined
-  private combatMessage: TimedHudMessage | undefined
+  private feedback: HudFeedback = {}
   private runState: RunState = createRunState()
   private placement!: TowerPlacementSystem
   private combat!: CombatSystem
@@ -71,6 +74,8 @@ export default class GameScene extends Phaser.Scene {
   private profileLoadEpoch = 0
   private persistedOnboarding = false
   private hasPlayedFanfare = false
+  private uiBlocked = false
+  private lastAnnouncedWave = 0
 
   constructor() {
     super('GameScene')
@@ -85,8 +90,9 @@ export default class GameScene extends Phaser.Scene {
     this.runState = createRunState(this.time.now)
     this.hasPlacedFirstTower = false
     this.onboardingState = createOnboardingState(this.time.now, CONFIG.ui.onboarding, GameScene.onboardingCompletedInSession)
-    this.combatMessage = undefined
-    this.placementMessage = undefined
+    this.feedback = {}
+    this.uiBlocked = false
+    this.lastAnnouncedWave = 0
     this.coins = CONFIG.run.startingCoins
     this.lives = CONFIG.run.startingLives
     this.result = null
@@ -105,11 +111,12 @@ export default class GameScene extends Phaser.Scene {
       },
       onLivesLose: (amount: number) => {
         this.lives = Math.max(0, this.lives - amount)
+        announceHpLoss(amount, this.lives)
         if (this.lives === 0) this.finishRun(false)
         return this.lives > 0
       },
-      onStatusUpdate: (status) => {
-        this.combatMessage = createTimedHudMessage(status, this.time.now, CONFIG.ui.status.combatMessageMs)
+      onStatusUpdate: (status, lane) => {
+        this.setFeedback(lane, status)
       },
       onEnemyLeaked: () => {
         this.runResultTracker = recordLeak(this.runResultTracker)
@@ -120,7 +127,7 @@ export default class GameScene extends Phaser.Scene {
     })
 
     this.placement = new TowerPlacementSystem(this, {
-      canInteract: () => isRunActive(this.runState),
+      canInteract: () => isRunActive(this.runState) && !this.uiBlocked,
       getCurrentCoins: () => this.coins,
       spendCoins: (amount: number): boolean => {
         if (this.coins < amount) return false
@@ -128,11 +135,10 @@ export default class GameScene extends Phaser.Scene {
         return true
       },
       onStatusUpdate: (status) => {
-        this.placementMessage = createTimedHudMessage(status, this.time.now, CONFIG.ui.status.placementMessageMs)
-        if (!status.trim()) {
-          this.placementMessage = undefined
-        }
+        this.setFeedback('action', status)
+        if (status.trim()) announcePlacement(status)
       },
+      onTowerChosen: () => this.handleOnboardingEvent('tower-chosen'),
       onTowerPlaced: () => {
         this.handleOnboardingEvent('tower-placed')
         if (!this.hasPlacedFirstTower) {
@@ -141,8 +147,9 @@ export default class GameScene extends Phaser.Scene {
         }
       },
       onTowerUpgraded: () => {
-        this.handleOnboardingEvent('tower-upgraded')
+        // Upgrades are intentionally optional during onboarding.
       },
+      onTowerSelected: () => this.handleOnboardingEvent('tower-selected'),
       onTowerSold: (amount) => {
         this.coins += amount
       },
@@ -175,6 +182,11 @@ export default class GameScene extends Phaser.Scene {
 
     this.onboardingState = this.applyOnboardingTransition(applyObjectiveAutoAdvance(this.onboardingState, this.time.now))
     this.combat.update(delta, this.placement.getTowers())
+    const wave = this.combat.getWaveProgress()
+    if (wave.phase === 'active' && wave.wave !== this.lastAnnouncedWave) {
+      this.lastAnnouncedWave = wave.wave
+      announceRaid(wave.wave, wave.totalWaves)
+    }
     this.checkWinState()
   }
 
@@ -192,10 +204,10 @@ export default class GameScene extends Phaser.Scene {
       activeEnemies: this.combat.activeEnemyCount,
       nextWaveInMs: waveProgress.nextEventMs,
       selectedTower: this.placement.getSnapshot(this.coins).selectedTower,
-      status: resolveHudStatus(
+      placement: this.placement.getSnapshot(this.coins),
+      status: resolveFeedbackStatus(
         this.time.now,
-        this.placementMessage,
-        this.combatMessage,
+        this.feedback,
         getRunFallbackStatus(this.hasPlacedFirstTower),
       ),
       waveLabel: formatWaveHud(waveProgress, this.combat.activeEnemyCount),
@@ -212,6 +224,31 @@ export default class GameScene extends Phaser.Scene {
 
   sellSelectedTower(): boolean {
     return this.placement.sellSelectedTower()
+  }
+
+  setUiBlocked(blocked: boolean): void {
+    this.uiBlocked = blocked
+    if (blocked) this.placement.cancelPlacement()
+  }
+
+  beginPlacement(type: TowerType): boolean {
+    return this.placement.beginPlacement(type)
+  }
+
+  cancelPlacement(): boolean {
+    return this.placement.cancelPlacement()
+  }
+
+  placeOnPad(padId: string): boolean {
+    return this.placement.placeOnPad(padId)
+  }
+
+  selectTower(towerId: string): boolean {
+    return this.placement.selectTower(towerId)
+  }
+
+  focusPad(padId: string): boolean {
+    return this.placement.focusPad(padId)
   }
 
   skipOnboarding(): void {
@@ -232,7 +269,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private handleOnboardingEvent(event: Parameters<typeof applyOnboardingEvent>[1]): void {
-    if (event === 'tower-placed' || event === 'tower-upgraded') {
+    if (event === 'tower-chosen' || event === 'tower-placed' || event === 'tower-selected') {
       this.onboardingState = this.applyOnboardingTransition(
         applyOnboardingPlayerAction(this.onboardingState, event, this.time.now),
       )
@@ -264,13 +301,23 @@ export default class GameScene extends Phaser.Scene {
     this.persistRunResult()
 
     this.placement.destroy()
-    this.placementMessage = undefined
-    this.combatMessage = undefined
+    this.feedback = {}
+    announceResult(didWin)
 
     if (didWin && !this.hasPlayedFanfare) {
       playFanfareSfx()
       this.hasPlayedFanfare = true
     }
+  }
+
+  private setFeedback(lane: FeedbackLane, status: string): void {
+    const duration =
+      lane === 'critical'
+        ? CONFIG.ui.status.criticalMessageMs
+        : lane === 'action'
+          ? CONFIG.ui.status.placementMessageMs
+          : CONFIG.ui.status.combatMessageMs
+    this.feedback = updateHudFeedback(this.feedback, lane, status, this.time.now, duration)
   }
 
   private async persistOnboardingComplete(): Promise<void> {

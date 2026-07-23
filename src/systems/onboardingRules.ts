@@ -1,6 +1,11 @@
 // Pure first-session tutorial transitions; session persistence stays in GameScene.
-export type OnboardingStep = 'objective' | 'place' | 'upgrade' | 'complete'
-export type OnboardingEvent = 'objective-viewed' | 'tower-placed' | 'tower-upgraded' | 'skip'
+export type OnboardingStep = 'objective' | 'choose' | 'place' | 'inspect' | 'complete'
+export type OnboardingEvent =
+  | 'objective-viewed'
+  | 'tower-chosen'
+  | 'tower-placed'
+  | 'tower-selected'
+  | 'skip'
 
 export interface OnboardingRuleConfig {
   objectiveAutoAdvanceMs: number
@@ -17,9 +22,10 @@ export interface OnboardingTransition {
 }
 
 const ONBOARDING_INSTRUCTIONS: Record<OnboardingStep, string> = {
-  objective: 'Objective: defend Hidden Dojo, then place and upgrade ninja defenses to survive all raids.',
-  place: 'Place one defense on a glowing build seal.',
-  upgrade: 'Upgrade your selected defense to continue.',
+  objective: 'Objective: protect the Hidden Dojo through all 10 raids.',
+  choose: '1 · Choose a defense card. Each card shows its combat role and cost.',
+  place: '2 · Tap a free ＋ seal to place it. Dragging is a shortcut.',
+  inspect: '3 · Tap the placed defense to inspect its range and upgrades.',
   complete: '',
 } as const
 
@@ -52,13 +58,13 @@ export function applyObjectiveAutoAdvance(state: OnboardingState, nowMs: number)
 
 export function applyOnboardingPlayerAction(
   state: OnboardingState,
-  event: Extract<OnboardingEvent, 'tower-placed' | 'tower-upgraded'>,
+  event: Extract<OnboardingEvent, 'tower-chosen' | 'tower-placed' | 'tower-selected'>,
   nowMs: number,
 ): OnboardingTransition {
   let currentState = state
   let didTransition = false
 
-  if (event === 'tower-placed' && currentState.step === 'objective') {
+  if (event === 'tower-chosen' && currentState.step === 'objective') {
     const acknowledgedObjective = applyOnboardingEvent(
       { ...currentState, autoAdvanceAtMs: nowMs },
       'objective-viewed',
@@ -97,16 +103,21 @@ export function applyOnboardingEvent(
   switch (state.step) {
     case 'objective':
       if (event === 'objective-viewed' && nowMs >= state.autoAdvanceAtMs) {
+        return { state: { ...state, step: 'choose' }, didTransition: true }
+      }
+      return { state, didTransition: false }
+    case 'choose':
+      if (event === 'tower-chosen') {
         return { state: { ...state, step: 'place' }, didTransition: true }
       }
       return { state, didTransition: false }
     case 'place':
       if (event === 'tower-placed') {
-        return { state: { ...state, step: 'upgrade' }, didTransition: true }
+        return { state: { ...state, step: 'inspect' }, didTransition: true }
       }
       return { state, didTransition: false }
-    case 'upgrade':
-      if (event === 'tower-upgraded') {
+    case 'inspect':
+      if (event === 'tower-selected') {
         return { state: { ...state, step: 'complete' }, didTransition: true }
       }
       return { state, didTransition: false }

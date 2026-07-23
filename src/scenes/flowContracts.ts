@@ -20,6 +20,20 @@ export interface MenuStartIntent {
   gameSceneActive?: boolean
 }
 
+export interface MenuLifecycleState {
+  isStarting: boolean
+  isDestroyed: boolean
+  focusedButton: 'play' | 'options'
+}
+
+export function createMenuLifecycleState(): MenuLifecycleState {
+  return {
+    isStarting: false,
+    isDestroyed: false,
+    focusedButton: 'play',
+  }
+}
+
 export type MenuActionResult =
   | 'start'
   | 'block-already-starting'

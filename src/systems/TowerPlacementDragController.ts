@@ -46,6 +46,11 @@ export default class TowerPlacementDragController {
     this.clearGhostAndHighlights()
   }
 
+  destroy(): void {
+    this.draggingType = undefined
+    this.clearGhostAndHighlights(false)
+  }
+
   startDrag(type: TowerType, pointer: Phaser.Input.Pointer): void {
     if (!this.options.canInteract()) return
 
@@ -139,6 +144,9 @@ export default class TowerPlacementDragController {
       const style = computePadVisualStyle({ x: pad.x, y: pad.y, occupied: Boolean(pad.occupiedBy) }, nearest, canPlace)
       pad.ring.setFillStyle(style.fillColor, style.fillAlpha)
       pad.ring.setStrokeStyle(2, style.strokeColor, style.strokeAlpha)
+      const isNearest = nearest?.x === pad.x && nearest?.y === pad.y
+      pad.marker.setText(pad.occupiedBy ? '×' : isNearest && !canPlace ? '!' : '＋')
+      pad.marker.setColor(isNearest && !canPlace ? '#ffaaa0' : '#fff4cf')
     }
   }
 
@@ -152,15 +160,17 @@ export default class TowerPlacementDragController {
     this.dragGhostSprite.setTint(valid ? 0xffffff : 0xe28b8b)
   }
 
-  private clearGhostAndHighlights(): void {
+  private clearGhostAndHighlights(resetPads = true): void {
     if (this.dragGhost) this.dragGhost.destroy()
     this.dragGhost = undefined
     this.dragGhostRange = undefined
     this.dragGhostSprite = undefined
 
+    if (!resetPads) return
     for (const pad of this.pads) {
       pad.ring.setFillStyle(PAD_FREE_COLOR, PAD_BASE_ALPHA)
       pad.ring.setStrokeStyle(2, PAD_FREE_COLOR, 0.35)
+      pad.marker.setText(pad.occupiedBy ? '×' : '＋').setColor('#fff4cf')
     }
   }
 

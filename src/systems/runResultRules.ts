@@ -24,6 +24,12 @@ export interface RunWaveStats {
   wavesCleared: number
 }
 
+export interface LeakResolution {
+  tracker: RunResultTracker
+  livesRemaining: number
+  isFatal: boolean
+}
+
 export function createRunResultTracker(nowMs: number): RunResultTracker {
   return { startMs: nowMs, kills: 0, leaks: 0 }
 }
@@ -38,6 +44,22 @@ export function recordLeak(state: RunResultTracker, count = 1): RunResultTracker
   const increment = Math.max(0, Math.floor(count))
   if (increment <= 0) return state
   return { ...state, leaks: state.leaks + increment }
+}
+
+export function resolveLeak(
+  tracker: RunResultTracker,
+  lives: number,
+  damage: number,
+): LeakResolution {
+  const normalizedLives = Math.max(0, Math.floor(lives))
+  const normalizedDamage = Math.max(0, Math.floor(damage))
+  const livesRemaining = Math.max(0, normalizedLives - normalizedDamage)
+
+  return {
+    tracker: recordLeak(tracker),
+    livesRemaining,
+    isFatal: livesRemaining === 0,
+  }
 }
 
 export function deriveWaveStats(snapshot: WaveProgressSnapshot): RunWaveStats {

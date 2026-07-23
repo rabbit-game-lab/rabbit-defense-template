@@ -3,6 +3,8 @@ import { CONFIG } from '../game.config'
 import {
   GAME_SCENE_KEY,
   MAIN_MENU_SCENE_KEY,
+  UI_SCENE_KEY,
+  createMenuLifecycleState,
   resolveMenuEscapeAction,
   resolveMenuOptionsAction,
   resolveMenuStartTransition,
@@ -12,6 +14,9 @@ import { createSceneButton, type SceneButtonHandle } from '../ui/createSceneButt
 import { AudioSettingsPanel } from '../ui/AudioSettingsPanel'
 import { loadProfile } from '../systems/profileStore'
 import type { ProfileRecord } from '../systems/profilePersistenceRules'
+import { initializeGameAccessibility } from '../accessibility/liveAnnouncements'
+import { loadAccessibilitySettings } from '../systems/accessibilitySettingsStore'
+import { createInactiveGameplayAdapter, createPortraitOrientationGate } from '../ui/createPortraitOrientationGate'
 
 interface MenuProfileView {
   wins: number
@@ -36,6 +41,7 @@ export default class MainMenuScene extends Phaser.Scene {
   private isDestroyed = false
   private profileLoadEpoch = 0
   private focusedButton: 'play' | 'options' = 'play'
+  private isInteractionReady = false
 
   private resolveBackgroundColor(color: string | number): number {
     if (typeof color === 'number') return Number.isFinite(color) ? color : 0x000000
@@ -60,6 +66,16 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.game.loop.wake()
+    const lifecycle = createMenuLifecycleState()
+    this.isStartingGame = lifecycle.isStarting
+    this.isDestroyed = lifecycle.isDestroyed
+    this.focusedButton = lifecycle.focusedButton
+    this.audioPanel = null
+    this.isInteractionReady = false
+    initializeGameAccessibility(this.game.canvas)
+    void loadAccessibilitySettings()
+
     this.game.canvas.dataset.scene = 'main-menu'
     delete this.game.canvas.dataset.overlay
     delete this.game.canvas.dataset.runId
@@ -125,11 +141,30 @@ export default class MainMenuScene extends Phaser.Scene {
       x: width / 2 + CONFIG.ui.mainMenu.buttonSpacing / 2,
       y: CONFIG.ui.mainMenu.buttonY,
       width: 180,
-      text: 'Options',
+      text: 'Settings',
       onActivate: () => this.openAudioPanel(),
       depth: 5,
     })
     this.setMenuFocus('play')
+    this.playButton.setEnabled(false)
+    this.optionsButton.setEnabled(false)
+    window.setTimeout(() => {
+      if (this.isDestroyed) return
+      this.isInteractionReady = true
+      this.playButton.setEnabled(true)
+      this.optionsButton.setEnabled(true)
+      this.setMenuFocus('play')
+    }, 120)
+    createPortraitOrientationGate(this, createInactiveGameplayAdapter(), (active) => {
+      if (active) this.game.canvas.dataset.overlay = 'orientation'
+      else if (!this.audioPanel) delete this.game.canvas.dataset.overlay
+    })
+    window.setTimeout(() => {
+      const manager = this.game.scene
+      manager.stop(UI_SCENE_KEY)
+      manager.stop(GAME_SCENE_KEY)
+      manager.bringToTop(MAIN_MENU_SCENE_KEY)
+    }, 0)
 
     this.loadProfileSummaryAsync()
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup)
@@ -168,7 +203,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   private openAudioPanel(): void {
-    if (this.audioPanel) return
+    if (this.audioPanel || !this.isInteractionReady) return
     const action = resolveMenuOptionsAction({ optionsOpen: this.audioPanel !== null, isStarting: this.isStartingGame })
     if (action === 'block-starting') return
 
@@ -207,6 +242,7 @@ export default class MainMenuScene extends Phaser.Scene {
   }
 
   private launchGame(): void {
+    if (!this.isInteractionReady) return
     const gameSceneIsActive = this.scene.get(GAME_SCENE_KEY)?.scene?.isActive() ?? false
 
     const transition = resolveMenuStartTransition({

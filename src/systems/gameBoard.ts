@@ -4,10 +4,12 @@ import { TOWER_TEXTURE_KEYS } from '../data/assets'
 import { BUILD_SPOTS, type TowerType, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
 
 export interface BuildPad {
+  id: string
   x: number
   y: number
   occupiedBy?: string
   ring: Phaser.GameObjects.Arc
+  marker: Phaser.GameObjects.Text
 }
 
 export interface ShopCard {
@@ -40,10 +42,15 @@ export function drawPath(scene: Phaser.Scene): void {
 }
 
 export function createBuildPads(scene: Phaser.Scene): BuildPad[] {
-  return BUILD_SPOTS.map((spot) => {
+  return BUILD_SPOTS.map((spot, index) => {
     const ring = scene.add.circle(spot.x, spot.y, CONFIG.run.buildSpotRadius, 0xf6d365, 0.08)
     ring.setStrokeStyle(2, 0xf6d365, 0.42)
-    return { ...spot, ring }
+    const marker = scene.add.text(spot.x, spot.y, '＋', {
+      fontSize: '20px',
+      color: '#fff4cf',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0.75)
+    return { id: `seal-${index + 1}`, ...spot, ring, marker }
   })
 }
 
@@ -61,7 +68,7 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
   scene.add.text(
     shopBounds.left + shopCfg.cardPadding,
     shopBounds.top + shopCfg.titleY,
-    'Drag defenses',
+    'Choose a defense',
     {
       fontSize: shopCfg.cardTitleFontSize,
       color: CONFIG.ui.textColor,
@@ -74,7 +81,7 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
 
   return SHOP_TOWER_ORDER.map((type, index) => {
     const tower = TOWERS[type]
-    const towerLabel = tower.name.split(' ')[0]
+    const towerLabel = tower.type === 'arrow' ? 'Fast' : tower.type === 'frost' ? 'Slow' : 'Splash'
 
     const cardLeft = shopBounds.left + shopCfg.cardPadding + index * shopCfg.cardSpacingX
     const cardTop = shopBounds.top + shopCfg.cardPadding + 18
@@ -89,11 +96,11 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
       .setDisplaySize(22, 22)
 
     const nameText = scene.add.text(0, 1, towerLabel, {
-      fontSize: '10px',
+      fontSize: shopCfg.cardLabelFontSize,
       color: CONFIG.ui.textColor,
     }).setOrigin(0.5, 0)
     const costText = scene.add.text(0, 14, `${tower.cost} ryo`, {
-      fontSize: '9px',
+      fontSize: shopCfg.cardCostFontSize,
       color: '#ffd56a',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0)
