@@ -6,7 +6,7 @@
 - Campaign envelope: 3/4 legal baselines win across 10 waves; at least two winners are required.
 - Product decision: the strategy spread is covered by the existing three towers and current map, so no fourth tower or additional map is added in this PR.
 
-- Arrow + Frost: DEFEAT | coins 515 | lives 0 | kills 41 | leaks 8 | spawned 54 | waves 9/10 | purchases 6
+- Shuriken + Ice: DEFEAT | coins 515 | lives 0 | kills 41 | leaks 8 | spawned 54 | waves 9/10 | purchases 6
   - Wave 1: buys 2, kills 4, leaks 0, Δcoins -61, Δlives 0
   - Wave 2: buys 0, kills 5, leaks 0, Δcoins 29, Δlives 0
   - Wave 3: buys 2, kills 5, leaks 0, Δcoins -36, Δlives 0
@@ -17,7 +17,7 @@
   - Wave 8: buys 0, kills 4, leaks 2, Δcoins 107, Δlives 0
   - Wave 9: buys 0, kills 2, leaks 1, Δcoins 55, Δlives 0
   - Wave 10: buys 0, kills 0, leaks 0, Δcoins 127, Δlives -15
-- Arrow + Bombard: VICTORY | coins 1083 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 6
+- Shuriken + Fire: VICTORY | coins 1083 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 6
   - Wave 1: buys 1, kills 4, leaks 0, Δcoins 9, Δlives 0
   - Wave 2: buys 1, kills 5, leaks 0, Δcoins -53, Δlives 0
   - Wave 3: buys 1, kills 5, leaks 0, Δcoins 6, Δlives 0
@@ -28,7 +28,7 @@
   - Wave 8: buys 0, kills 7, leaks 0, Δcoins 171, Δlives 0
   - Wave 9: buys 0, kills 6, leaks 0, Δcoins 172, Δlives 0
   - Wave 10: buys 0, kills 1, leaks 0, Δcoins 382, Δlives 0
-- Arrow upgrades: VICTORY | coins 940 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 9
+- Shuriken upgrades: VICTORY | coins 940 | lives 15 | kills 54 | leaks 0 | spawned 54 | waves 10/10 | purchases 9
   - Wave 1: buys 2, kills 4, leaks 0, Δcoins -41, Δlives 0
   - Wave 2: buys 1, kills 5, leaks 0, Δcoins -8, Δlives 0
   - Wave 3: buys 1, kills 5, leaks 0, Δcoins 21, Δlives 0

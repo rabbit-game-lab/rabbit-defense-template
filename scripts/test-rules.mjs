@@ -62,6 +62,27 @@ import {
   deserializeProfile,
   serializeProfile,
 } from '../.tmp-tests/src/systems/profilePersistenceRules.js'
+import {
+  createDefaultAudioSettings,
+  deserializeAudioSettings,
+  normalizeAudioSettings,
+  serializeAudioSettings,
+} from '../.tmp-tests/src/systems/audioSettingsRules.js'
+import {
+  __setAudioSettingsStorageAdapter,
+  getCachedAudioSettings,
+  loadAudioSettings,
+  resetAudioSettings,
+  saveAudioSettings,
+} from '../.tmp-tests/src/systems/audioSettingsStore.js'
+import {
+  applyAudioSettings,
+  clearRuntimeMuteOverride,
+  getAudioSettings as getAudioSettingsFromManager,
+  setMuted,
+  setSoundVolume,
+} from '../.tmp-tests/src/systems/audioManager.js'
+import { initializePersistedAudioSettings } from '../.tmp-tests/src/systems/audioStartup.js'
 
 import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
 import {
@@ -643,8 +664,270 @@ assert.equal(profileAfterWin.bestCoins, 50)
 assert.equal(profileAfterWin.fastestWinMs, 320)
 assert.equal(profileAfterLoss.defeats, 1)
 
+// audioSettingsRules
+assert.deepEqual(createDefaultAudioSettings(), {
+  muted: false,
+  soundVolume: 0.45,
+})
+
+assert.deepEqual(normalizeAudioSettings({}), {
+  muted: false,
+  soundVolume: 0.45,
+})
+assert.deepEqual(normalizeAudioSettings({ muted: 'yes', soundVolume: 2 }), {
+  muted: false,
+  soundVolume: 1,
+})
+assert.deepEqual(normalizeAudioSettings({ muted: true, soundVolume: -0.3 }), {
+  muted: true,
+  soundVolume: 0,
+})
+assert.deepEqual(normalizeAudioSettings({ muted: 1, soundVolume: Number.NaN }), {
+  muted: false,
+  soundVolume: 0.45,
+})
+assert.deepEqual(normalizeAudioSettings({ muted: true, soundVolume: Number.POSITIVE_INFINITY }), {
+  muted: true,
+  soundVolume: 0.45,
+})
+
+assert.deepEqual(deserializeAudioSettings(null), createDefaultAudioSettings())
+assert.deepEqual(deserializeAudioSettings('bad'), createDefaultAudioSettings())
+assert.deepEqual(deserializeAudioSettings('{"muted":true,"soundVolume":0.9}'), {
+  muted: true,
+  soundVolume: 0.9,
+})
+assert.deepEqual(deserializeAudioSettings('{"soundVolume":2}'), {
+  muted: false,
+  soundVolume: 1,
+})
+assert.deepEqual(deserializeAudioSettings('{"muted":1,"soundVolume":0}'), {
+  muted: false,
+  soundVolume: 0,
+})
+assert.deepEqual(deserializeAudioSettings('{"muted":true,"soundVolume":"high"}'), {
+  muted: true,
+  soundVolume: 0.45,
+})
+
+const serializedAudio = serializeAudioSettings({ muted: true, soundVolume: 0.66 })
+assert.deepEqual(deserializeAudioSettings(serializedAudio), {
+  muted: true,
+  soundVolume: 0.66,
+})
+
+// Concurrency: a load should not overwrite a newer save that completes first.
+const concurrentAudioStorage = {
+  values: new Map(),
+  release: null,
+  releasePromise: null,
+}
+concurrentAudioStorage.releasePromise = new Promise((resolve) => {
+  concurrentAudioStorage.release = resolve
+})
+concurrentAudioStorage.values.set('rabbit-defense-audio-settings', JSON.stringify({ muted: false, soundVolume: 0.2 }))
+const concurrentAdapter = {
+  async getItem(key) {
+    await concurrentAudioStorage.releasePromise
+    return concurrentAudioStorage.values.get(key) ?? null
+  },
+  async setItem(key, value) {
+    concurrentAudioStorage.values.set(key, value)
+  },
+}
+__setAudioSettingsStorageAdapter(concurrentAdapter)
+
+const inFlightLoad = loadAudioSettings()
+const savedWhileLoading = await saveAudioSettings({ muted: true, soundVolume: 0.9 })
+concurrentAudioStorage.release()
+const loadResultAfterConcurrentSave = await inFlightLoad
+assert.deepEqual(savedWhileLoading, { muted: true, soundVolume: 0.9 }, 'audio save remains durable while a storage load is pending')
+assert.deepEqual(loadResultAfterConcurrentSave, savedWhileLoading, 'concurrent load result does not lose the newer save')
+assert.deepEqual(getCachedAudioSettings(), savedWhileLoading, 'concurrent save remains cached when load resolves late')
+
+// Adapter changes during in-flight load should invalidate stale storage reads.
+const staleAdapter = {
+  values: new Map([
+    ['rabbit-defense-audio-settings', JSON.stringify({ muted: true, soundVolume: 0.4 })],
+  ]),
+  release: null,
+  releasePromise: null,
+}
+staleAdapter.releasePromise = new Promise((resolve) => {
+  staleAdapter.release = resolve
+})
+const delayedOldAdapter = {
+  async getItem(key) {
+    await staleAdapter.releasePromise
+    return staleAdapter.values.get(key) ?? null
+  },
+  async setItem(key, value) {
+    staleAdapter.values.set(key, value)
+  },
+}
+const switchedAdapter = {
+  async getItem() {
+    return JSON.stringify({ muted: false, soundVolume: 0.6 })
+  },
+  async setItem() {
+    return undefined
+  },
+}
+__setAudioSettingsStorageAdapter(delayedOldAdapter)
+const staleLoad = loadAudioSettings()
+__setAudioSettingsStorageAdapter(switchedAdapter)
+staleAdapter.release()
+assert.deepEqual(await staleLoad, { muted: false, soundVolume: 0.6 }, 'stale load does not overwrite state after adapter switch')
+
+// audioSettingsStore
+function createMemoryAudioAdapter() {
+  const values = new Map()
+  return {
+    async getItem(key) {
+      return values.get(key) ?? null
+    },
+    async setItem(key, value) {
+      values.set(key, value)
+    },
+    values,
+  }
+}
+
+const memoryAudioAdapter = createMemoryAudioAdapter()
+__setAudioSettingsStorageAdapter(memoryAudioAdapter)
+
+const loadedFromFreshStorage = await loadAudioSettings()
+assert.deepEqual(loadedFromFreshStorage, createDefaultAudioSettings())
+const savedSettings = await saveAudioSettings({ muted: true, soundVolume: 0.7 })
+assert.deepEqual(savedSettings, { muted: true, soundVolume: 0.7 })
+const cachedAgain = await loadAudioSettings()
+assert.deepEqual(cachedAgain, savedSettings)
+await saveAudioSettings({ muted: false, soundVolume: 0.2 })
+assert.equal(memoryAudioAdapter.values.get('rabbit-defense-audio-settings') !== undefined, true)
+cachedAgain.soundVolume = 1
+assert.equal((await loadAudioSettings()).soundVolume, 0.2, 'store returns cloned audio settings')
+assert.equal(getCachedAudioSettings()?.soundVolume, 0.2)
+
+const resetSettings = await resetAudioSettings()
+assert.deepEqual(resetSettings, createDefaultAudioSettings())
+
+const readErrorAdapter = {
+  getItem: async () => {
+    throw new Error('read fail')
+  },
+  setItem: async () => undefined,
+}
+__setAudioSettingsStorageAdapter(readErrorAdapter)
+assert.deepEqual(await loadAudioSettings(), createDefaultAudioSettings(), 'read errors fall back to defaults')
+
+const writeErrorAdapter = {
+  getItem: async () => null,
+  async setItem() {
+    throw new Error('write fail')
+  },
+}
+__setAudioSettingsStorageAdapter(writeErrorAdapter)
+const writeErrorSettings = await saveAudioSettings({ muted: true, soundVolume: 0.9 })
+assert.deepEqual(writeErrorSettings, { muted: true, soundVolume: 0.9 }, 'write errors are swallowed and still return settings')
+
+// audioManager
+applyAudioSettings({ muted: true, soundVolume: 0 })
+assert.deepEqual(getAudioSettingsFromManager(), { muted: true, soundVolume: 0 })
+setMuted(false)
+assert.equal(getAudioSettingsFromManager().muted, false)
+setSoundVolume(1.3)
+assert.equal(getAudioSettingsFromManager().soundVolume, 1)
+setSoundVolume(-0.5)
+assert.equal(getAudioSettingsFromManager().soundVolume, 0)
+const liveSettingsFromManager = getAudioSettingsFromManager()
+liveSettingsFromManager.soundVolume = 0.1
+assert.notEqual(getAudioSettingsFromManager().soundVolume, 0.1, 'audioManager exposes defensive clones')
+
+clearRuntimeMuteOverride()
+
+let persistedSettingsCalls = 0
+const persistedSettingsResult = await initializePersistedAudioSettings({
+  loadAudioSettings: async () => {
+    persistedSettingsCalls += 1
+    return { muted: true, soundVolume: 0.25 }
+  },
+  applyAudioSettings: (settings) => {
+    assert.deepEqual(settings, { muted: true, soundVolume: 0.25 })
+    applyAudioSettings(settings)
+    assert.equal(persistedSettingsCalls, 1)
+  },
+})
+assert.equal(persistedSettingsCalls, 1)
+assert.equal(persistedSettingsResult, undefined)
+
+clearRuntimeMuteOverride()
+setMuted(true)
+await initializePersistedAudioSettings({
+  loadAudioSettings: async () => ({ muted: false, soundVolume: 0.2 }),
+  applyAudioSettings: (settings) => {
+    assert.deepEqual(settings, { muted: false, soundVolume: 0.2 })
+    applyAudioSettings(settings)
+  },
+})
+assert.equal(getAudioSettingsFromManager().muted, true, 'explicit runtime mute from platform callbacks is preserved across startup load')
+assert.equal(getAudioSettingsFromManager().soundVolume, 0.2, 'persisted startup load still applies volume while runtime mute is active')
+
+let startupResolve = null
+let startupResolved = false
+const startupGate = new Promise((resolve) => {
+  startupResolve = resolve
+})
+clearRuntimeMuteOverride()
+const startupDuringLoad = initializePersistedAudioSettings({
+  loadAudioSettings: async () => {
+    await startupGate
+    startupResolved = true
+    return { muted: false, soundVolume: 0.35 }
+  },
+  applyAudioSettings: (settings) => {
+    assert.deepEqual(settings, { muted: false, soundVolume: 0.35 })
+    applyAudioSettings(settings)
+  },
+})
+setMuted(false)
+startupResolve?.()
+await startupDuringLoad
+assert.equal(startupResolved, true, 'startup load callback resolves before override assertion check')
+assert.equal(getAudioSettingsFromManager().muted, false, 'runtime mute set during startup load controls the result')
+assert.equal(getAudioSettingsFromManager().soundVolume, 0.35, 'startup still applies sound volume when muted by runtime override')
+
+clearRuntimeMuteOverride()
+await initializePersistedAudioSettings({
+  loadAudioSettings: async () => ({ muted: false, soundVolume: 0.66 }),
+  applyAudioSettings: (settings) => {
+    assert.deepEqual(settings, { muted: false, soundVolume: 0.66 })
+    applyAudioSettings(settings)
+  },
+})
+await initializePersistedAudioSettings({
+  loadAudioSettings: async () => ({ muted: true, soundVolume: 0.12 }),
+  applyAudioSettings: (settings) => {
+    assert.deepEqual(settings, { muted: true, soundVolume: 0.12 })
+    applyAudioSettings(settings)
+  },
+})
+assert.equal(getAudioSettingsFromManager().muted, true, 'startup application does not become a runtime mute override')
+
+let fallbackApplied = false
+await initializePersistedAudioSettings({
+  loadAudioSettings: async () => {
+    throw new Error('storage read failed')
+  },
+  applyAudioSettings: (settings) => {
+    fallbackApplied = true
+    assert.deepEqual(settings, createDefaultAudioSettings())
+    applyAudioSettings(settings)
+  },
+})
+assert.equal(fallbackApplied, true)
+
 // towerEconomyRules
 assert.equal(refundForTowerEconomy({ cost: 40, level: 1, upgradeCost: 25, investedCost: 150 }, 0.6), 90)
 assert.equal(refundForTowerEconomy({ cost: 40, level: 2, upgradeCost: 25 }, 0.5), 32)
 
-console.log('towerDefenseRules, waveRules, runResultRules, profilePersistenceRules, towerEconomyRules, onboardingRules, hudRules, and runState tests passed')
+console.log('audio settings + towerDefenseRules, waveRules, runResultRules, profilePersistenceRules, towerEconomyRules, onboardingRules, hudRules, and runState tests passed')

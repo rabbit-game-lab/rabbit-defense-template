@@ -1,8 +1,13 @@
 /** Loads every asset declared in data/assets.ts, then starts the game. */
 import Phaser from 'phaser'
 import { IMAGES } from '../data/assets'
+import { initializePersistedAudioSettings } from '../systems/audioStartup.js'
+import { applyAudioSettings } from '../systems/audioManager.js'
+import { loadAudioSettings } from '../systems/audioSettingsStore.js'
 
 export default class BootScene extends Phaser.Scene {
+  private hasStartedNextScene = false
+
   constructor() {
     super('BootScene')
   }
@@ -26,6 +31,24 @@ export default class BootScene extends Phaser.Scene {
       gfx.destroy()
     }
 
+    void (async () => {
+      try {
+        await initializePersistedAudioSettings({
+          loadAudioSettings,
+          applyAudioSettings,
+        })
+      } catch {
+        // Non-blocking: continue boot even when audio persistence is unavailable.
+        applyAudioSettings({})
+      } finally {
+        this.startNextScene()
+      }
+    })()
+  }
+
+  private startNextScene(): void {
+    if (this.hasStartedNextScene) return
+    this.hasStartedNextScene = true
     this.scene.start('GameScene')
   }
 

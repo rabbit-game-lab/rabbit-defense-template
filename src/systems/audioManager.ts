@@ -2,11 +2,16 @@
  * Procedural WebAudio SFX — no audio files.
  * AudioContext unlock and mute arrive through rabbit/sdk.
  */
-import * as sdk from '../rabbit/sdk'
-import { CONFIG } from '../game.config'
+import * as sdk from '../rabbit/sdk.js'
+import {
+  createDefaultAudioSettings,
+  type AudioSettings,
+  normalizeAudioSettings as normalizeAudioSettingsRules,
+} from './audioSettingsRules.js'
 
 let ctx: AudioContext | null = null
-let muted = false
+let audioSettings: AudioSettings = createDefaultAudioSettings()
+let runtimeMuted: boolean | null = null
 
 function getCtx(): AudioContext {
   if (!ctx) {
@@ -17,13 +22,59 @@ function getCtx(): AudioContext {
   return ctx
 }
 
+function getEffectiveVolume(toneVolume: number): number {
+  if (audioSettings.muted) return 0
+  return toneVolume * audioSettings.soundVolume
+}
+
+export function applyAudioSettings(next: Partial<AudioSettings>): AudioSettings {
+  audioSettings = normalizeAudioSettingsRules({
+    ...audioSettings,
+    ...next,
+    ...(runtimeMuted !== null
+      ? {
+          muted: runtimeMuted,
+        }
+      : {}),
+  })
+  return getAudioSettings()
+}
+
+export function getAudioSettings(): AudioSettings {
+  return {
+    muted: audioSettings.muted,
+    soundVolume: audioSettings.soundVolume,
+  }
+}
+
+export function setRuntimeMuted(value: boolean): void {
+  runtimeMuted = value
+  setMuted(value)
+}
+
+export function clearRuntimeMuteOverride(): void {
+  runtimeMuted = null
+}
+
 export function setMuted(value: boolean): void {
-  muted = value
+  runtimeMuted = value
+  audioSettings = normalizeAudioSettingsRules({
+    ...audioSettings,
+    muted: value,
+  })
+}
+
+export function setSoundVolume(value: number): void {
+  audioSettings = normalizeAudioSettingsRules({
+    ...audioSettings,
+    soundVolume: value,
+  })
 }
 
 function playTone(startHz: number, endHz: number, seconds: number, volume = 0.22, type: OscillatorType = 'triangle'): void {
-  if (muted) return
   try {
+    const effectiveVolume = getEffectiveVolume(volume)
+    if (effectiveVolume === 0) return
     const c = getCtx()
     const now = c.currentTime
     const osc = c.createOscillator()
@@ -31,7 +82,7 @@ function playTone(startHz: number, endHz: number, seconds: number, volume = 0.22
     osc.type = type
     osc.frequency.setValueAtTime(startHz, now)
     osc.frequency.linearRampToValueAtTime(endHz, now + seconds)
-    gain.gain.setValueAtTime(volume * CONFIG.audio.sfxVolume, now)
+    gain.gain.setValueAtTime(effectiveVolume, now)
     gain.gain.exponentialRampToValueAtTime(0.001, now + seconds)
     osc.connect(gain).connect(c.destination)
     osc.start(now)
@@ -72,7 +123,7 @@ export function playFanfareSfx(): void {
   window.setTimeout(() => playTone(660, 990, 0.18, 0.2), 90)
 }
 
-/** Reusable decaying white-noise burst for future medieval impacts. */
+/** Reusable decaying white-noise burst for future effects. */
 export function makeNoiseBurst(c: AudioContext, seconds: number): AudioBufferSourceNode {
   const bufferSize = c.sampleRate * seconds
   const buffer = c.createBuffer(1, bufferSize, c.sampleRate)
