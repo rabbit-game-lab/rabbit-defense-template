@@ -62,6 +62,25 @@ export const uiConfig = {
     closeButtonHeight: 44,
     closeButtonFontSize: '14px',
   },
+  pauseMenu: {
+    // What: Placement and size of the in-game pause control and overlays.
+    // Feel: Reachable on touch without covering the shop or bottom HUD.
+    // Range: Controls >=44px; overlay depth above gameplay HUD.
+    // Related: PauseMenuController and shared AudioSettingsPanel.
+    // Units: px (logical pixels), except colors/depth.
+    buttonX: 772,
+    buttonY: 150,
+    buttonSize: 48,
+    panelWidth: 340,
+    panelHeight: 320,
+    panelColor: 0x1f2b20,
+    depth: 180,
+    buttonWidth: 210,
+    confirmPanelWidth: 420,
+    confirmPanelHeight: 180,
+    confirmButtonWidth: 130,
+    audioDepthOffset: 50,
+  },
   shop: {
     panelX: 684,
     panelY: 64,

@@ -99,6 +99,11 @@ import {
   isRestartSceneConfigured,
 } from '../.tmp-tests/src/scenes/flowContracts.js'
 
+import {
+  resolvePauseMenuAction,
+  resolvePauseMenuEffect,
+} from '../.tmp-tests/src/ui/pauseMenuRules.js'
+
 import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
 import {
   createBaselineStrategies,
@@ -150,12 +155,57 @@ assert.equal(resolveMenuEscapeAction({ optionsOpen: false }), 'ignore')
 assert.equal(isRestartSceneConfigured('MainMenuScene'), true)
 assert.equal(isRestartSceneConfigured('GameScene'), false)
 
+const assertPauseStateMachine = (from, action, to, effect) => {
+  assert.deepEqual(resolvePauseMenuAction(from, action), to)
+  assert.deepEqual(resolvePauseMenuEffect(from, action), effect)
+}
+assertPauseStateMachine('running', 'toggle-pause', 'paused', 'pause-game')
+for (const action of ['resume', 'open-options', 'request-restart', 'request-menu', 'cancel', 'confirm-restart', 'confirm-menu', 'close-options']) {
+  assertPauseStateMachine('running', action, 'running', 'none')
+}
+
+assertPauseStateMachine('paused', 'toggle-pause', 'running', 'resume-game')
+assertPauseStateMachine('paused', 'resume', 'running', 'resume-game')
+assertPauseStateMachine('paused', 'open-options', 'options', 'none')
+assertPauseStateMachine('paused', 'request-restart', 'confirm-restart', 'none')
+assertPauseStateMachine('paused', 'request-menu', 'confirm-menu', 'none')
+for (const action of ['close-options', 'confirm-restart', 'confirm-menu', 'cancel']) {
+  assertPauseStateMachine('paused', action, 'paused', 'none')
+}
+
+for (const action of ['toggle-pause', 'close-options', 'cancel']) {
+  assertPauseStateMachine('options', action, 'paused', 'none')
+}
+for (const action of ['open-options', 'request-restart', 'request-menu', 'confirm-restart', 'confirm-menu', 'resume']) {
+  assertPauseStateMachine('options', action, 'options', 'none')
+}
+
+assertPauseStateMachine('confirm-restart', 'confirm-restart', 'running', 'restart-run')
+for (const action of ['cancel', 'toggle-pause']) {
+  assertPauseStateMachine('confirm-restart', action, 'paused', 'none')
+}
+for (const action of ['resume', 'request-restart', 'request-menu', 'close-options', 'confirm-menu', 'open-options']) {
+  assertPauseStateMachine('confirm-restart', action, 'confirm-restart', 'none')
+}
+
+assertPauseStateMachine('confirm-menu', 'confirm-menu', 'running', 'go-main-menu')
+for (const action of ['cancel', 'toggle-pause']) {
+  assertPauseStateMachine('confirm-menu', action, 'paused', 'none')
+}
+for (const action of ['request-menu', 'request-restart', 'open-options', 'resume', 'close-options', 'confirm-restart']) {
+  assertPauseStateMachine('confirm-menu', action, 'confirm-menu', 'none')
+}
+
 const sceneRegistrySource = readFileSync('src/scenes/index.ts', 'utf8')
 const bootSceneSource = readFileSync('src/scenes/BootScene.ts', 'utf8')
 const menuSceneSource = readFileSync('src/scenes/MainMenuScene.ts', 'utf8')
 const gameSceneSource = readFileSync('src/scenes/GameScene.ts', 'utf8')
 const sceneButtonSource = readFileSync('src/ui/createSceneButton.ts', 'utf8')
 const audioPanelSource = readFileSync('src/ui/AudioSettingsPanel.ts', 'utf8')
+const uiSceneSource = readFileSync('src/scenes/UIScene.ts', 'utf8')
+const pauseMenuRulesSource = readFileSync('src/ui/pauseMenuRules.ts', 'utf8')
+const pauseMenuControllerSource = readFileSync('src/ui/PauseMenuController.ts', 'utf8')
+const uiConfigSource = readFileSync('src/config/ui.config.ts', 'utf8')
 assert.match(sceneRegistrySource, /\[BootScene, MainMenuScene, GameScene, UIScene\]/)
 assert.match(sceneRegistrySource, /RESTART_SCENE_KEY = 'MainMenuScene'/)
 assert.match(bootSceneSource, /resolveBootNextScene\(true\)/)
@@ -163,11 +213,38 @@ assert.match(menuSceneSource, /new AudioSettingsPanel/)
 assert.match(menuSceneSource, /keydown-TAB/)
 assert.match(menuSceneSource, /setMenuFocus/)
 assert.match(menuSceneSource, /dataset\.scene = 'main-menu'/)
+assert.match(menuSceneSource, /delete this\.game\.canvas\.dataset\.runId/)
 assert.match(menuSceneSource, /dataset\.overlay = 'audio-options'/)
 assert.match(gameSceneSource, /dataset\.scene = 'game'/)
+assert.match(gameSceneSource, /dataset\.runId = String\(sessionId\)/)
 assert.match(sceneButtonSource, /minTouchablePx/)
 assert.match(sceneButtonSource, /depth\?: number/)
-assert.match(audioPanelSource, /PANEL_DEPTH/)
+assert.match(audioPanelSource, /baseDepth \+ PANEL_DEPTH\.panel/)
+assert.match(pauseMenuRulesSource, /export type PauseMenuState/)
+assert.match(pauseMenuRulesSource, /resolvePauseMenuAction/)
+assert.match(pauseMenuRulesSource, /resolvePauseMenuEffect/)
+assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.pause\(\)/)
+assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.resume\(\)/)
+assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.restart\(\)/)
+assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.stop\(\)/)
+assert.match(pauseMenuControllerSource, /scene\.scene\.start\(MAIN_MENU_SCENE_KEY\)/)
+assert.match(pauseMenuControllerSource, /keydown-ESC/)
+assert.match(pauseMenuControllerSource, /keydown-P/)
+assert.match(pauseMenuControllerSource, /keydown-M/)
+assert.match(pauseMenuControllerSource, /setKeyboardFocus/)
+assert.match(pauseMenuControllerSource, /new AudioSettingsPanel/)
+assert.match(pauseMenuControllerSource, /baseDepth:/)
+assert.match(pauseMenuControllerSource, /confirm-restart/)
+assert.match(pauseMenuControllerSource, /confirm-menu/)
+assert.match(pauseMenuControllerSource, /confirmationReadyAt/)
+assert.match(pauseMenuControllerSource, /focusButton\(1\)/)
+assert.match(uiSceneSource, /pauseMenuController/)
+assert.match(uiSceneSource, /createSceneButton\(this/)
+assert.match(uiSceneSource, /dataset\.overlay = marker/)
+assert.match(uiSceneSource, /delete this\.game\.canvas\.dataset\.overlay/)
+assert.match(uiSceneSource, /setEnabled\(!hud\.result\)/)
+assert.match(uiConfigSource, /pauseMenu/)
+assert.match(uiConfigSource, /buttonSize: 48/)
 
 const balanceStrategies = createBaselineStrategies()
 assert.deepEqual(

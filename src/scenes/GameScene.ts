@@ -80,6 +80,7 @@ export default class GameScene extends Phaser.Scene {
     this.game.canvas.dataset.scene = 'game'
     delete this.game.canvas.dataset.overlay
     const sessionId = ++GameScene.nextRunId
+    this.game.canvas.dataset.runId = String(sessionId)
 
     this.runState = createRunState(this.time.now)
     this.hasPlacedFirstTower = false
