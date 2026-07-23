@@ -68,7 +68,9 @@ import {
   createBaselineStrategies,
   simulateStrategy,
 } from '../.tmp-tests/src/systems/balanceSimulator.js'
-import { WAVES as balanceWaves } from '../.tmp-tests/src/data/towerDefense.js'
+import { buildTimeoutResult } from '../.tmp-tests/src/systems/balanceSimulationOutcome.js'
+import { createSimulationState } from '../.tmp-tests/src/systems/balanceSimulationMath.js'
+import { ENEMIES as balanceEnemies, WAVES as balanceWaves } from '../.tmp-tests/src/data/towerDefense.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -77,6 +79,28 @@ const path = [
 ]
 
 const balanceStrategies = createBaselineStrategies()
+assert.equal(balanceWaves.length, 10, 'campaign contains exactly ten waves')
+assert.deepEqual(
+  balanceWaves.slice(0, 5).map((wave) => wave.enemies),
+  [
+    ['grunt', 'grunt', 'grunt', 'runner'],
+    ['grunt', 'runner', 'grunt', 'runner', 'grunt'],
+    ['runner', 'runner', 'grunt', 'grunt', 'tank'],
+    ['grunt', 'tank', 'runner', 'grunt', 'runner', 'tank'],
+    ['tank', 'grunt', 'runner', 'tank', 'runner', 'grunt', 'tank'],
+  ],
+  'the five onboarding waves remain unchanged',
+)
+const bossWaves = balanceWaves
+  .map((wave, index) => wave.enemies.includes('warden') ? index + 1 : null)
+  .filter((wave) => wave !== null)
+assert.deepEqual(bossWaves, [10], 'Fortress Beetle appears only in the final wave')
+assert.equal(balanceEnemies.warden.slowResistance, 1, 'Fortress Beetle fully resists new slows')
+assert.equal(
+  buildTimeoutResult(createSimulationState(), balanceStrategies[0]).outcome,
+  'timeout',
+  'simulation timeout stays distinct from gameplay defeat',
+)
 assert.deepEqual(
   balanceStrategies.map((strategy) => strategy.id),
   ['arrow-frost', 'arrow-bomb', 'arrow-focused', 'balanced-three'],
@@ -200,6 +224,15 @@ assert.deepEqual(
 )
 assert.equal(advanceEnemyAlongPath({ x: 100, y: 90, pathIndex: 1, progress: 90 }, path, 20).escaped, true)
 
+const firstSubpixelStep = advanceEnemyAlongPath(
+  { x: 0, y: 0, pathIndex: 0, progress: 0 },
+  path,
+  0.48,
+)
+const secondSubpixelStep = advanceEnemyAlongPath(firstSubpixelStep, path, 0.48)
+assert.equal(firstSubpixelStep.progress, 0.48, 'subpixel progress is preserved after one tick')
+assert.equal(secondSubpixelStep.progress, 0.96, 'subpixel progress accumulates instead of rounding back to zero')
+
 const enemies = [
   { id: 'tank', x: 180, y: 100, hp: 30, pathIndex: 0, progress: 70, escaped: false },
   { id: 'runner', x: 120, y: 100, hp: 10, pathIndex: 0, progress: 95, escaped: false },
@@ -221,12 +254,22 @@ assert.equal(chooseTowerTarget({ x: 115, y: 100, range: 40 }, sameProgress)?.id,
 assert.deepEqual(
   evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100),
   { slowFactor: 0.55, slowUntil: 1200 },
-  'fresh slow applies its configured factor',
+  'fresh slow applies its configured factor without resistance (default 0)',
 )
 assert.deepEqual(
   evaluateSlowImpact({ slowFactor: 0.55, slowUntil: 500 }, { slowFactor: 0.8, slowUntil: 1400 }, 600),
   { slowFactor: 0.8, slowUntil: 1400 },
   'expired slow cannot leak its stronger factor into a new impact',
+)
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100, 0.5),
+  { slowFactor: 0.775, slowUntil: 1200 },
+  'partial resistance weakens incoming slow',
+)
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100, 1),
+  { slowFactor: 1, slowUntil: 0 },
+  'full resistance negates all slow',
 )
 assert.deepEqual(
   evaluateSlowImpact({ slowFactor: 0.55, slowUntil: 900 }, { slowFactor: 0.8, slowUntil: 1500 }, 500),

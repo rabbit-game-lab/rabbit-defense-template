@@ -90,6 +90,7 @@ export default class CombatSystem {
       x: start.x,
       y: start.y,
       maxHp: stats.hp,
+      slowResistance: stats.slowResistance,
       pathIndex: 0,
       progress: 0,
       slowFactor: 1,
@@ -162,7 +163,12 @@ export default class CombatSystem {
     for (const enemy of victims) {
       const nextSlowUntil = projectile.slowMs ? now + projectile.slowMs : undefined
       const result = damageEnemy(
-        { hp: enemy.hp, slowFactor: enemy.slowFactor, slowUntil: enemy.slowUntil },
+        {
+          hp: enemy.hp,
+          slowFactor: enemy.slowFactor,
+          slowUntil: enemy.slowUntil,
+          slowResistance: enemy.slowResistance,
+        },
         projectile.damage,
         now,
         projectile.slowFactor,

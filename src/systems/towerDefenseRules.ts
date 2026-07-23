@@ -76,6 +76,7 @@ export interface DamageableEnemy {
   hp: number
   slowFactor: number
   slowUntil: number
+  slowResistance?: number
 }
 
 export interface DamageResult extends DamageableEnemy {
@@ -181,12 +182,28 @@ function normalizeSlowFactor(value: number | undefined): number {
   return Math.min(1, Math.max(0, value))
 }
 
+function normalizeSlowResistance(value: number | undefined): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0
+  return Math.min(1, Math.max(0, value))
+}
+
+function applySlowResistance(slowFactor: number, slowResistance: number): number {
+  const normalizedFactor = normalizeSlowFactor(slowFactor)
+  const normalizedResistance = normalizeSlowResistance(slowResistance)
+  return 1 - (1 - normalizedFactor) * (1 - normalizedResistance)
+}
+
 export interface ActiveSlow {
   slowFactor: number
   slowUntil: number
 }
 
-export function evaluateSlowImpact(active: ActiveSlow, incoming: ActiveSlow | undefined, now: number): ActiveSlow {
+export function evaluateSlowImpact(
+  active: ActiveSlow,
+  incoming: ActiveSlow | undefined,
+  now: number,
+  slowResistance = 0,
+): ActiveSlow {
   const activeExpired = now >= active.slowUntil
   const effectiveActive: ActiveSlow = activeExpired
     ? { slowFactor: 1, slowUntil: 0 }
@@ -204,12 +221,11 @@ export function evaluateSlowImpact(active: ActiveSlow, incoming: ActiveSlow | un
     return effectiveActive
   }
 
-  const normalizedIncomingFactor = normalizeSlowFactor(incoming.slowFactor)
+  const normalizedIncomingFactor = applySlowResistance(incoming.slowFactor, slowResistance)
+  if (normalizedIncomingFactor === 1) return effectiveActive
 
   const strongerEffect = Math.min(effectiveActive.slowFactor, normalizedIncomingFactor)
   if (strongerEffect === 1) return { slowFactor: normalizedIncomingFactor, slowUntil: incoming.slowUntil }
-
-  if (normalizedIncomingFactor === 1) return effectiveActive
 
   return {
     slowFactor: strongerEffect,
@@ -229,6 +245,7 @@ export function damageEnemy(
     { slowFactor: enemy.slowFactor, slowUntil: enemy.slowUntil },
     slowFactor === undefined || slowUntil === undefined ? undefined : { slowFactor, slowUntil },
     now,
+    enemy.slowResistance,
   )
 
   return {
@@ -270,7 +287,7 @@ export function advanceEnemyAlongPath(enemy: MovingEnemyState, path: readonly Po
       progress += remaining
       remaining = 0
       const pos = pointOnSegment(start, end, progress)
-      return { ...pos, pathIndex, progress: Math.round(progress), escaped: false }
+      return { ...pos, pathIndex, progress, escaped: false }
     }
 
     remaining -= leftOnSegment

@@ -41,11 +41,12 @@ export interface SimWaveMetrics {
 export interface SimulatedStrategyResult {
   strategy: string
   strategyName: string
-  outcome: 'victory' | 'defeat'
+  outcome: 'victory' | 'defeat' | 'timeout'
   finalCoins: number
   finalLives: number
   totalKills: number
   totalLeaks: number
+  totalSpawned: number
   wavesCleared: number
   wavesReached: number
   finalWave: number
