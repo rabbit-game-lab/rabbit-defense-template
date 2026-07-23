@@ -6,9 +6,18 @@ import {
   computeTowerUpgrade,
   damageEnemy,
   distanceBetween,
+  evaluateSlowImpact,
   refundForTower,
   spendCoins,
 } from '../.tmp-tests/src/systems/towerDefenseRules.js'
+import { createRunState, finishRun, getRunStatus, isRunActive } from '../.tmp-tests/src/systems/runState.js'
+import {
+  createWaveState,
+  isWaveRunComplete,
+  markWaveEnemySpawned,
+  nextWaveEnemy,
+  scaleEnemyStats,
+} from '../.tmp-tests/src/systems/waveRules.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -16,43 +25,53 @@ const path = [
   { x: 100, y: 100 },
 ]
 
-assert.equal(canAffordTower(100, { cost: 75 }), true, 'player can buy affordable tower')
-assert.equal(canAffordTower(50, { cost: 75 }), false, 'player cannot buy tower without coins')
-assert.equal(spendCoins(100, 75), 25, 'spending subtracts tower cost')
-assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78, 'sell refund includes half base+upgrade spend')
-
-assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5, 'distance uses euclidean length')
-
+assert.equal(canAffordTower(100, { cost: 75 }), true)
+assert.equal(canAffordTower(50, { cost: 75 }), false)
+assert.equal(spendCoins(100, 75), 25)
+assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
+assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 0, y: 0, pathIndex: 0, progress: 0 }, path, 60),
   { x: 60, y: 0, pathIndex: 0, progress: 60, escaped: false },
-  'enemy advances along first path segment',
 )
-
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 80, y: 0, pathIndex: 0, progress: 80 }, path, 50),
   { x: 100, y: 30, pathIndex: 1, progress: 30, escaped: false },
-  'enemy carries leftover movement into next segment',
 )
-
-assert.equal(
-  advanceEnemyAlongPath({ x: 100, y: 90, pathIndex: 1, progress: 90 }, path, 20).escaped,
-  true,
-  'enemy escapes after passing final waypoint',
-)
+assert.equal(advanceEnemyAlongPath({ x: 100, y: 90, pathIndex: 1, progress: 90 }, path, 20).escaped, true)
 
 const enemies = [
   { id: 'tank', x: 180, y: 100, hp: 30, pathIndex: 0, progress: 70, escaped: false },
   { id: 'runner', x: 120, y: 100, hp: 10, pathIndex: 0, progress: 95, escaped: false },
   { id: 'dead', x: 110, y: 100, hp: 0, pathIndex: 0, progress: 120, escaped: false },
 ]
-assert.equal(
-  chooseTowerTarget({ x: 100, y: 100, range: 90 }, enemies)?.id,
-  'runner',
-  'tower targets living enemy furthest along path inside range',
-)
+assert.equal(chooseTowerTarget({ x: 100, y: 100, range: 90 }, enemies)?.id, 'runner')
 
-assert.deepEqual(damageEnemy({ hp: 12, slowedUntil: 0 }, 15, 500), { hp: 0, killed: true, slowedUntil: 500 })
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100),
+  { slowFactor: 0.55, slowUntil: 1200 },
+  'fresh slow applies its configured factor',
+)
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 0.55, slowUntil: 500 }, { slowFactor: 0.8, slowUntil: 1400 }, 600),
+  { slowFactor: 0.8, slowUntil: 1400 },
+  'expired slow cannot leak its stronger factor into a new impact',
+)
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 0.55, slowUntil: 900 }, { slowFactor: 0.8, slowUntil: 1500 }, 500),
+  { slowFactor: 0.55, slowUntil: 1500 },
+  'active stronger slow keeps its factor and extends expiry',
+)
+assert.deepEqual(
+  evaluateSlowImpact({ slowFactor: 0.8, slowUntil: 900 }, { slowFactor: 0.55, slowUntil: 700 }, 500),
+  { slowFactor: 0.55, slowUntil: 900 },
+  'incoming stronger slow uses the strongest factor and longest expiry',
+)
+assert.deepEqual(
+  damageEnemy({ hp: 12, slowFactor: 0.55, slowUntil: 500 }, 15, 600),
+  { hp: 0, killed: true, slowFactor: 1, slowUntil: 0 },
+  'damage clears expired slow state',
+)
 assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateMs: 700, upgradeCost: 50 }), {
   level: 2,
   damage: 12,
@@ -61,4 +80,35 @@ assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateM
   upgradeCost: 75,
 })
 
-console.log('towerDefenseRules tests passed')
+const waves = [
+  { enemies: ['a', 'b'], spawnEveryMs: 100 },
+  { enemies: ['c'], spawnEveryMs: 50 },
+]
+const waveState = createWaveState(1000, 300)
+assert.equal(nextWaveEnemy(waveState, 999, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 1000, waves), 'a', 'first enemy spawns exactly at startAt')
+markWaveEnemySpawned(waveState, 1000, waves)
+assert.equal(nextWaveEnemy(waveState, 1099, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 1100, waves), 'b')
+markWaveEnemySpawned(waveState, 1100, waves)
+assert.equal(waveState.waveIndex, 1)
+assert.equal(waveState.betweenWaveUntil, 1400)
+assert.equal(nextWaveEnemy(waveState, 1399, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 1400, waves), 'c', 'configured cooldown gates the next wave')
+markWaveEnemySpawned(waveState, 1400, waves)
+assert.equal(isWaveRunComplete(waveState, waves.length), true)
+assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
+assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
+assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })
+
+const running = createRunState(100)
+assert.equal(isRunActive(running), true)
+assert.equal(getRunStatus(running), 'running')
+const victory = finishRun(running, 'victory', 500)
+assert.equal(victory.didTransition, true)
+assert.deepEqual(victory.state, { status: 'won', startedAt: 100, endedAt: 500 })
+const repeated = finishRun(victory.state, 'defeat', 900)
+assert.equal(repeated.didTransition, false, 'terminal transition is idempotent')
+assert.equal(repeated.state, victory.state, 'repeated finish preserves the original object and outcome')
+
+console.log('towerDefenseRules, waveRules, and runState tests passed')

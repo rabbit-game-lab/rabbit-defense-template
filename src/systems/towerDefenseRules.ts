@@ -36,7 +36,8 @@ export interface TowerTargeter extends Point {
 
 export interface DamageableEnemy {
   hp: number
-  slowedUntil: number
+  slowFactor: number
+  slowUntil: number
 }
 
 export interface DamageResult extends DamageableEnemy {
@@ -49,6 +50,11 @@ export interface TowerUpgradeStats {
   range: number
   fireRateMs: number
   upgradeCost: number
+}
+
+export interface ActiveSlow {
+  slowFactor: number
+  slowUntil: number
 }
 
 export function canAffordTower(coins: number, tower: TowerCostLike): boolean {
@@ -66,6 +72,64 @@ export function refundForTower(tower: TowerEconomyLike): number {
 
 export function distanceBetween(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
+function normalizeSlowFactor(value: number | undefined): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 1
+  return Math.min(1, Math.max(0, value))
+}
+
+export function evaluateSlowImpact(active: ActiveSlow, incoming: ActiveSlow | undefined, now: number): ActiveSlow {
+  const activeExpired = now >= active.slowUntil
+  const effectiveActive: ActiveSlow = activeExpired
+    ? { slowFactor: 1, slowUntil: 0 }
+    : {
+        slowFactor: normalizeSlowFactor(active.slowFactor),
+        slowUntil: active.slowUntil,
+      }
+
+  if (!incoming) {
+    return effectiveActive
+  }
+
+  const incomingExpired = now >= incoming.slowUntil
+  if (incomingExpired) {
+    return effectiveActive
+  }
+
+  const normalizedIncomingFactor = normalizeSlowFactor(incoming.slowFactor)
+
+  const strongerEffect = Math.min(effectiveActive.slowFactor, normalizedIncomingFactor)
+  if (strongerEffect === 1) return { slowFactor: normalizedIncomingFactor, slowUntil: incoming.slowUntil }
+
+  if (normalizedIncomingFactor === 1) return effectiveActive
+
+  return {
+    slowFactor: strongerEffect,
+    slowUntil: Math.max(effectiveActive.slowUntil, incoming.slowUntil),
+  }
+}
+
+export function damageEnemy(
+  enemy: DamageableEnemy,
+  damage: number,
+  now: number,
+  slowFactor?: number,
+  slowUntil?: number,
+): DamageResult {
+  const hp = Math.max(0, enemy.hp - Math.max(0, damage))
+  const nextSlow = evaluateSlowImpact(
+    { slowFactor: enemy.slowFactor, slowUntil: enemy.slowUntil },
+    slowFactor === undefined || slowUntil === undefined ? undefined : { slowFactor, slowUntil },
+    now,
+  )
+
+  return {
+    hp,
+    slowFactor: nextSlow.slowFactor,
+    slowUntil: nextSlow.slowUntil,
+    killed: hp === 0,
+  }
 }
 
 function segmentLength(a: Point, b: Point): number {
@@ -115,11 +179,6 @@ export function chooseTowerTarget<T extends TargetableEnemy>(tower: TowerTargete
   return enemies
     .filter((enemy) => enemy.hp > 0 && !enemy.escaped && distanceBetween(tower, enemy) <= tower.range)
     .sort((a, b) => b.pathIndex - a.pathIndex || b.progress - a.progress)[0]
-}
-
-export function damageEnemy(enemy: DamageableEnemy, damage: number, slowedUntil = enemy.slowedUntil): DamageResult {
-  const hp = Math.max(0, enemy.hp - Math.max(0, damage))
-  return { hp, slowedUntil, killed: hp === 0 }
 }
 
 export function computeTowerUpgrade(tower: TowerUpgradeStats): TowerUpgradeStats {

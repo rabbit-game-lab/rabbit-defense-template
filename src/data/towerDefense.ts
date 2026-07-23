@@ -17,6 +17,7 @@ export interface TowerDefinition {
   slowFactor?: number
   slowMs?: number
   splashRadius?: number
+  upgradeCost: number
 }
 
 export interface EnemyDefinition {
@@ -56,6 +57,14 @@ export const BUILD_SPOTS: readonly Point[] = [
   { x: 610, y: 270 },
 ]
 
+export const SHOP_TOWER_ORDER: readonly TowerType[] = ['arrow', 'frost', 'bomb']
+
+export const SHOP_CARD_WIDTH = 52
+export const SHOP_CARD_HEIGHT = 34
+export const SHOP_CARD_SPACING_X = 61
+export const SHOP_PANEL = { x: 694, y: 58, width: 196, height: 78 }
+export const SHOP_CARD_START = { x: 590, y: 24 }
+
 export const TOWERS: Record<TowerType, TowerDefinition> = {
   arrow: {
     type: 'arrow',
@@ -68,6 +77,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     color: 0x8b5a2b,
     topColor: 0xf6d365,
     description: 'Fast single-target shots.',
+    upgradeCost: 55,
   },
   frost: {
     type: 'frost',
@@ -82,6 +92,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     description: 'Slows monsters with low damage.',
     slowFactor: 0.55,
     slowMs: 1200,
+    upgradeCost: 55,
   },
   bomb: {
     type: 'bomb',
@@ -95,6 +106,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     topColor: 0xff9b54,
     description: 'Slow splash damage.',
     splashRadius: 44,
+    upgradeCost: 55,
   },
 }
 
