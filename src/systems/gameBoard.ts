@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
 import { BUILD_SPOTS, PATH, type TowerType, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
-import { distanceBetween } from './towerDefenseRules'
 
 export interface BuildPad {
   x: number
@@ -128,13 +127,6 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
 
     return { type, x: centerX, y: centerY, width: cardWidth, height: cardHeight }
   })
-}
-
-export function nearestFreePad(x: number, y: number, pads: readonly BuildPad[]): BuildPad | undefined {
-  return pads
-    .filter((pad) => !pad.occupiedBy)
-    .filter((pad) => distanceBetween(pad, { x, y }) <= CONFIG.run.buildSpotRadius)
-    .sort((a, b) => distanceBetween(a, { x, y }) - distanceBetween(b, { x, y }))[0]
 }
 
 function isNearPathPoint(x: number, y: number, radius: number): boolean {

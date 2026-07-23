@@ -6,6 +6,8 @@ import {
   computeTowerUpgrade,
   createTowerUpgradePreview,
   resolveTowerUpgradeRequest,
+  resolvePlacementDrop,
+  findNearestPadWithinRadius,
   damageEnemy,
   distanceBetween,
   evaluateSlowImpact,
@@ -43,9 +45,89 @@ assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
 assert.deepEqual(
-  advanceEnemyAlongPath({ x: 0, y: 0, pathIndex: 0, progress: 0 }, path, 60),
-  { x: 60, y: 0, pathIndex: 0, progress: 60, escaped: false },
+  findNearestPadWithinRadius(
+    { x: 5, y: 0 },
+    [
+      { x: 3, y: 0, occupied: true },
+      { x: 10, y: 0, occupied: false },
+      { x: 20, y: 0, occupied: false },
+    ],
+    12,
+  ),
+  {
+    nearestPad: { x: 3, y: 0, occupied: true },
+    validPad: undefined,
+    valid: false,
+  },
+  'the nearest occupied pad blocks snapping to a different free pad',
 )
+
+const placementSuccess = resolvePlacementDrop(
+  { x: 7, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementSuccess.type, 'success')
+assert.equal(placementSuccess.spendAmount, 50)
+assert.equal(placementSuccess.nextCoins, 30)
+assert.equal(placementSuccess.target?.x, 10)
+
+const placementOutside = resolvePlacementDrop(
+  { x: 200, y: 200 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementOutside.type, 'cancelled')
+assert.equal(placementOutside.reason, 'outside-range')
+assert.equal(placementOutside.spendAmount, 0)
+assert.equal(placementOutside.nextCoins, 80)
+assert.equal(placementOutside.status, 'Drag cancelled — drop on a glowing circle.')
+
+const placementOccupied = resolvePlacementDrop(
+  { x: 3, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementOccupied.type, 'cancelled')
+assert.equal(placementOccupied.reason, 'occupied-pad')
+assert.equal(placementOccupied.spendAmount, 0)
+assert.equal(placementOccupied.nextCoins, 80)
+assert.equal(placementOccupied.status, 'That build circle is already occupied.')
+
+const placementInsufficient = resolvePlacementDrop(
+  { x: 10, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  20,
+)
+assert.equal(placementInsufficient.type, 'cancelled')
+assert.equal(placementInsufficient.reason, 'insufficient-funds')
+assert.equal(placementInsufficient.spendAmount, 0)
+assert.equal(placementInsufficient.nextCoins, 20)
+assert.equal(placementInsufficient.status, 'Need 50 coins to build Arrow Tower.')
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 80, y: 0, pathIndex: 0, progress: 80 }, path, 50),
   { x: 100, y: 30, pathIndex: 1, progress: 30, escaped: false },

@@ -3,6 +3,44 @@ export interface Point {
   y: number
 }
 
+export interface BuildPadState {
+  x: number
+  y: number
+  occupied: boolean
+}
+
+type PlacementOutOfRangeReason = 'outside-range' | 'occupied-pad' | 'insufficient-funds'
+
+export interface TowerPlacementCostLike {
+  towerName: string
+  cost: number
+}
+
+export interface PlacementDropOutcomeSuccess {
+  type: 'success'
+  target: BuildPadState
+  spendAmount: number
+  nextCoins: number
+  status: string
+}
+
+export interface PlacementDropOutcomeFailed {
+  type: 'cancelled'
+  reason: PlacementOutOfRangeReason
+  target: BuildPadState | undefined
+  spendAmount: 0
+  nextCoins: number
+  status: string
+}
+
+export type PlacementDropOutcome = PlacementDropOutcomeSuccess | PlacementDropOutcomeFailed
+
+export interface PlacementProbe {
+  nearestPad: BuildPadState | undefined
+  validPad: BuildPadState | undefined
+  valid: boolean
+}
+
 export interface TowerCostLike {
   cost: number
 }
@@ -88,6 +126,73 @@ export interface ActiveSlow {
 
 export function canAffordTower(coins: number, tower: TowerCostLike): boolean {
   return coins >= tower.cost
+}
+
+export function findNearestPadWithinRadius(
+  pointer: Point,
+  pads: readonly BuildPadState[],
+  radius: number,
+): PlacementProbe {
+  const inRangePads = pads.filter((pad) => distanceBetween(pad, pointer) <= radius)
+  const sortedByDistance = inRangePads.sort((a, b) => distanceBetween(a, pointer) - distanceBetween(b, pointer))
+  const nearestPad = sortedByDistance[0]
+  const validPad = nearestPad && !nearestPad.occupied ? nearestPad : undefined
+  return {
+    nearestPad,
+    validPad,
+    valid: Boolean(validPad),
+  }
+}
+
+export function resolvePlacementDrop(
+  pointer: Point,
+  pads: readonly BuildPadState[],
+  radius: number,
+  tower: TowerPlacementCostLike,
+  currentCoins: number,
+): PlacementDropOutcome {
+  const { nearestPad, validPad } = findNearestPadWithinRadius(pointer, pads, radius)
+
+  if (!validPad) {
+    if (nearestPad?.occupied) {
+      return {
+        type: 'cancelled',
+        reason: 'occupied-pad',
+        target: nearestPad,
+        spendAmount: 0,
+        nextCoins: currentCoins,
+        status: 'That build circle is already occupied.',
+      }
+    }
+
+    return {
+      type: 'cancelled',
+      reason: 'outside-range',
+      target: undefined,
+      spendAmount: 0,
+      nextCoins: currentCoins,
+      status: 'Drag cancelled — drop on a glowing circle.',
+    }
+  }
+
+  if (currentCoins < tower.cost) {
+    return {
+      type: 'cancelled',
+      reason: 'insufficient-funds',
+      target: validPad,
+      spendAmount: 0,
+      nextCoins: currentCoins,
+      status: `Need ${tower.cost} coins to build ${tower.towerName}.`,
+    }
+  }
+
+  return {
+    type: 'success',
+    target: validPad,
+    spendAmount: tower.cost,
+    nextCoins: currentCoins - tower.cost,
+    status: `${tower.towerName} placed.`,
+  }
 }
 
 export function spendCoins(coins: number, cost: number): number {
