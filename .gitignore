@@ -13,3 +13,4 @@ Thumbs.db
 .idea/
 .claude/worktrees/
 .tmp-tests/
+.tmp-balance/

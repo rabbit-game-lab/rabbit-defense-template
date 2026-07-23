@@ -1,5 +1,5 @@
-import { CONFIG } from '../game.config'
-import { ENEMIES, type EnemyType, WAVES } from '../data/towerDefense'
+import { CONFIG } from '../game.config.js'
+import { ENEMIES, type EnemyType, WAVES } from '../data/towerDefense.js'
 import {
   createWaveState as createPureWaveState,
   isWaveRunComplete,
@@ -10,10 +10,10 @@ import {
   createWaveProgressSnapshot,
   type WaveSpawnState,
   type WaveProgressSnapshot,
-} from './waveRules'
+} from './waveRules.js'
 
-export type { WaveSpawnState } from './waveRules'
-export type { WaveProgressSnapshot } from './waveRules'
+export type { WaveSpawnState } from './waveRules.js'
+export type { WaveProgressSnapshot } from './waveRules.js'
 
 export function createWaveState(
   startAt: number,
