@@ -16,11 +16,12 @@ import {
 } from './waves'
 import { playDefeatSfx, playLeakSfx, playShotSfx } from './audioManager'
 import type { TowerRuntime } from '../entities/TowerView'
+import type { FeedbackLane } from './hudRules'
 
 interface CombatCallbacks {
   onCoinsGain: (amount: number) => void
   onLivesLose: (amount: number) => boolean
-  onStatusUpdate: (status: string) => void
+  onStatusUpdate: (status: string, lane: FeedbackLane) => void
   onEnemyKilled?: () => void
   onEnemyLeaked?: () => void
 }
@@ -188,9 +189,9 @@ export default class CombatSystem {
   private leakEnemy(enemy: EnemyRuntime): boolean {
     this.enemies = this.enemies.filter((item) => item !== enemy)
     enemy.view.destroy()
-    this.callbacks.onStatusUpdate(`${enemy.name} breached Hidden Dojo!`)
-    const canContinue = this.callbacks.onLivesLose(enemy.leakDamage)
+    this.callbacks.onStatusUpdate(`${enemy.name} breached Hidden Dojo!`, 'critical')
     this.callbacks.onEnemyLeaked?.()
+    const canContinue = this.callbacks.onLivesLose(enemy.leakDamage)
     playLeakSfx()
     return canContinue
   }
@@ -200,7 +201,7 @@ export default class CombatSystem {
 
     this.enemies = this.enemies.filter((item) => item !== enemy)
     enemy.view.destroy()
-    this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} ryo.`)
+    this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} ryo.`, 'ambient')
     this.callbacks.onCoinsGain(enemy.reward)
     this.callbacks.onEnemyKilled?.()
     playDefeatSfx()

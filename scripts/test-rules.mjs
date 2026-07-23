@@ -37,8 +37,10 @@ import {
 import {
   createTimedHudMessage,
   getRunFallbackStatus,
+  resolveFeedbackStatus,
   resolveHudStatus,
   formatWaveHud,
+  updateHudFeedback,
 } from '../.tmp-tests/src/systems/hudRules.js'
 
 import {
@@ -46,6 +48,7 @@ import {
   deriveWaveStats,
   recordKill,
   recordLeak,
+  resolveLeak,
   buildRunResult,
 } from '../.tmp-tests/src/systems/runResultRules.js'
 
@@ -85,6 +88,20 @@ import {
 } from '../.tmp-tests/src/systems/audioManager.js'
 import { initializePersistedAudioSettings } from '../.tmp-tests/src/systems/audioStartup.js'
 import {
+  createDefaultAccessibilitySettings,
+  deserializeAccessibilitySettings,
+  normalizeAccessibilitySettings,
+  serializeAccessibilitySettings,
+} from '../.tmp-tests/src/systems/accessibilitySettingsRules.js'
+import {
+  __setAccessibilitySettingsStorageAdapter,
+  getAccessibilitySettings,
+  isReducedEffectsEnabled,
+  loadAccessibilitySettings,
+  setReducedEffects,
+} from '../.tmp-tests/src/systems/accessibilitySettingsStore.js'
+import { shouldAnnounce } from '../.tmp-tests/src/accessibility/liveAnnouncements.js'
+import {
   clampAudioPercent,
   formatBestProfileResult,
   resolvePanelFillPercent,
@@ -92,6 +109,7 @@ import {
 } from '../.tmp-tests/src/ui/audioSettingsPanelRules.js'
 import {
   EXPECTED_SCENE_ORDER,
+  createMenuLifecycleState,
   resolveBootNextScene,
   resolveMenuEscapeAction,
   resolveMenuOptionsAction,
@@ -103,6 +121,11 @@ import {
   resolvePauseMenuAction,
   resolvePauseMenuEffect,
 } from '../.tmp-tests/src/ui/pauseMenuRules.js'
+import {
+  calculateResponsiveViewport,
+  createOrientationGateState,
+  resolveOrientationGate,
+} from '../.tmp-tests/src/ui/orientationGateRules.js'
 
 import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
 import {
@@ -143,6 +166,11 @@ assert.equal(
 assert.deepEqual(EXPECTED_SCENE_ORDER, ['BootScene', 'MainMenuScene', 'GameScene', 'UIScene'])
 assert.deepEqual(resolveBootNextScene(false), { type: 'wait' })
 assert.deepEqual(resolveBootNextScene(true), { type: 'start', nextScene: 'MainMenuScene' })
+assert.deepEqual(
+  createMenuLifecycleState(),
+  { isStarting: false, isDestroyed: false, focusedButton: 'play' },
+  'each menu creation resets transient lifecycle guards',
+)
 assert.equal(resolveMenuStartAction({ isStarting: false, optionsOpen: false }), 'start')
 assert.equal(resolveMenuStartAction({ isStarting: true, optionsOpen: false }), 'block-already-starting')
 assert.equal(resolveMenuStartAction({ isStarting: false, optionsOpen: true }), 'block-options-open')
@@ -154,6 +182,54 @@ assert.equal(resolveMenuEscapeAction({ optionsOpen: true }), 'close-options')
 assert.equal(resolveMenuEscapeAction({ optionsOpen: false }), 'ignore')
 assert.equal(isRestartSceneConfigured('MainMenuScene'), true)
 assert.equal(isRestartSceneConfigured('GameScene'), false)
+
+let feedback = {}
+feedback = updateHudFeedback(feedback, 'ambient', 'Scout defeated', 100, 1_000)
+feedback = updateHudFeedback(feedback, 'action', 'Tower placed', 200, 1_000)
+feedback = updateHudFeedback(feedback, 'critical', 'Dojo breached!', 300, 400)
+assert.equal(
+  resolveFeedbackStatus(350, feedback, 'Ready'),
+  'Dojo breached!',
+  'critical feedback cannot be hidden by placement or ambient messages',
+)
+assert.equal(
+  resolveFeedbackStatus(750, feedback, 'Ready'),
+  'Tower placed',
+  'action feedback returns after the critical warning expires',
+)
+assert.equal(
+  resolveFeedbackStatus(1_250, feedback, 'Ready'),
+  'Ready',
+  'expired feedback yields to the fallback status',
+)
+feedback = updateHudFeedback(feedback, 'critical', '   ', 1_300, 1_000)
+assert.equal(
+  resolveFeedbackStatus(1_300, feedback, 'Ready'),
+  'Ready',
+  'clearing one lane does not resurrect expired feedback',
+)
+
+const trackerBeforeFatalLeak = recordKill(createRunResultTracker(1_000), 2)
+const fatalLeak = resolveLeak(trackerBeforeFatalLeak, 2, 3)
+assert.equal(fatalLeak.tracker.leaks, 1, 'the fatal enemy is recorded before defeat accounting')
+assert.equal(fatalLeak.livesRemaining, 0, 'fatal leak damage clamps lives at zero')
+assert.equal(fatalLeak.isFatal, true)
+const fatalLeakResult = buildRunResult(
+  fatalLeak.tracker,
+  4_000,
+  'defeat',
+  {
+    wave: 2,
+    totalWaves: 10,
+    phase: 'active',
+    toSpawnInCurrentWave: 0,
+    nextEventMs: 0,
+  },
+  fatalLeak.livesRemaining,
+  25,
+)
+assert.equal(fatalLeakResult.leaks, 1, 'the defeat snapshot includes the fatal breach')
+assert.equal(fatalLeakResult.livesRemaining, 0)
 
 const assertPauseStateMachine = (from, action, to, effect) => {
   assert.deepEqual(resolvePauseMenuAction(from, action), to)
@@ -200,8 +276,10 @@ const sceneRegistrySource = readFileSync('src/scenes/index.ts', 'utf8')
 const bootSceneSource = readFileSync('src/scenes/BootScene.ts', 'utf8')
 const menuSceneSource = readFileSync('src/scenes/MainMenuScene.ts', 'utf8')
 const gameSceneSource = readFileSync('src/scenes/GameScene.ts', 'utf8')
+const combatSystemSource = readFileSync('src/systems/CombatSystem.ts', 'utf8')
 const sceneButtonSource = readFileSync('src/ui/createSceneButton.ts', 'utf8')
 const audioPanelSource = readFileSync('src/ui/AudioSettingsPanel.ts', 'utf8')
+const indexHtmlSource = readFileSync('index.html', 'utf8')
 const uiSceneSource = readFileSync('src/scenes/UIScene.ts', 'utf8')
 const pauseMenuRulesSource = readFileSync('src/ui/pauseMenuRules.ts', 'utf8')
 const pauseMenuControllerSource = readFileSync('src/ui/PauseMenuController.ts', 'utf8')
@@ -215,18 +293,28 @@ assert.match(menuSceneSource, /setMenuFocus/)
 assert.match(menuSceneSource, /dataset\.scene = 'main-menu'/)
 assert.match(menuSceneSource, /delete this\.game\.canvas\.dataset\.runId/)
 assert.match(menuSceneSource, /dataset\.overlay = 'audio-options'/)
+assert.match(menuSceneSource, /const lifecycle = createMenuLifecycleState\(\)/)
+assert.ok(
+  menuSceneSource.indexOf('const lifecycle = createMenuLifecycleState()') <
+    menuSceneSource.indexOf("this.game.canvas.dataset.scene = 'main-menu'"),
+  'menu transient state resets before controls are recreated',
+)
 assert.match(gameSceneSource, /dataset\.scene = 'game'/)
 assert.match(gameSceneSource, /dataset\.runId = String\(sessionId\)/)
 assert.match(sceneButtonSource, /minTouchablePx/)
 assert.match(sceneButtonSource, /depth\?: number/)
 assert.match(audioPanelSource, /baseDepth \+ PANEL_DEPTH\.panel/)
+assert.match(indexHtmlSource, /<main aria-labelledby="game-title">/)
+assert.match(indexHtmlSource, /id="game-instructions"/)
+assert.match(indexHtmlSource, /id="game-live-status"/)
+assert.doesNotMatch(indexHtmlSource, /user-scalable=no/)
 assert.match(pauseMenuRulesSource, /export type PauseMenuState/)
 assert.match(pauseMenuRulesSource, /resolvePauseMenuAction/)
 assert.match(pauseMenuRulesSource, /resolvePauseMenuEffect/)
 assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.pause\(\)/)
 assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.resume\(\)/)
-assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.restart\(\)/)
-assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.stop\(\)/)
+assert.match(pauseMenuControllerSource, /manager\.start\(GAME_SCENE_KEY\)/)
+assert.match(menuSceneSource, /manager\.stop\(GAME_SCENE_KEY\)/)
 assert.match(pauseMenuControllerSource, /scene\.scene\.start\(MAIN_MENU_SCENE_KEY\)/)
 assert.match(pauseMenuControllerSource, /keydown-ESC/)
 assert.match(pauseMenuControllerSource, /keydown-P/)
@@ -244,7 +332,12 @@ assert.match(uiSceneSource, /dataset\.overlay = marker/)
 assert.match(uiSceneSource, /delete this\.game\.canvas\.dataset\.overlay/)
 assert.match(uiSceneSource, /setEnabled\(!hud\.result\)/)
 assert.match(uiConfigSource, /pauseMenu/)
-assert.match(uiConfigSource, /buttonSize: 48/)
+assert.match(uiConfigSource, /buttonSize: 56/)
+assert.ok(
+  combatSystemSource.indexOf('this.callbacks.onEnemyLeaked?.()') <
+    combatSystemSource.indexOf('this.callbacks.onLivesLose(enemy.leakDamage)'),
+  'combat records a breach before fatal damage can create the defeat result',
+)
 
 const balanceStrategies = createBaselineStrategies()
 assert.deepEqual(
@@ -650,34 +743,37 @@ assert.equal(mkSnapshot('complete', 0, 0, 5, 5, 0), 'All raids repelled')
 const onboardingConfig = { objectiveAutoAdvanceMs: 1700 }
 let onboardingState = createOnboardingState(0, onboardingConfig, false)
 assert.equal(onboardingState.step, 'objective')
-assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: defend Hidden Dojo, then place and upgrade ninja defenses to survive all raids.')
-assert.equal(getOnboardingInstruction('place'), 'Place one defense on a glowing build seal.')
-assert.equal(getOnboardingInstruction('upgrade'), 'Upgrade your selected defense to continue.')
+assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: protect the Hidden Dojo through all 10 raids.')
+assert.match(getOnboardingInstruction('choose'), /Choose a defense card/)
+assert.match(getOnboardingInstruction('place'), /Tap a free/)
+assert.match(getOnboardingInstruction('inspect'), /inspect its range/)
 
 onboardingState = applyObjectiveAutoAdvance(onboardingState, 1200).state
 assert.equal(onboardingState.step, 'objective')
-assert.equal(applyObjectiveAutoAdvance(onboardingState, 1700).state.step, 'place', 'objective auto-advances after configured delay')
+assert.equal(applyObjectiveAutoAdvance(onboardingState, 1700).state.step, 'choose', 'objective auto-advances after configured delay')
 
 onboardingState = createOnboardingState(0, onboardingConfig, false)
-onboardingState = applyOnboardingEvent(onboardingState, 'tower-upgraded', 2000).state
-assert.equal(onboardingState.step, 'objective', 'upgrades do not advance objective')
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-selected', 2000).state
+assert.equal(onboardingState.step, 'objective', 'inspection does not skip choosing')
 
 let transition = applyOnboardingEvent(onboardingState, 'tower-placed', 2500)
-assert.equal(transition.didTransition, false, 'placement cannot advance before objective deadline')
+assert.equal(transition.didTransition, false, 'placement cannot skip choosing')
 assert.equal(transition.state.step, 'objective')
 
-const fastPlacement = applyOnboardingPlayerAction(createOnboardingState(0, onboardingConfig, false), 'tower-placed', 250)
-assert.equal(fastPlacement.didTransition, true)
-assert.equal(fastPlacement.state.step, 'upgrade', 'early placement acknowledges objective and completes placement step')
+const fastChoice = applyOnboardingPlayerAction(createOnboardingState(0, onboardingConfig, false), 'tower-chosen', 250)
+assert.equal(fastChoice.didTransition, true)
+assert.equal(fastChoice.state.step, 'place', 'early choice acknowledges the objective and advances')
 
 onboardingState = createOnboardingState(0, onboardingConfig, false)
 onboardingState = { ...onboardingState, autoAdvanceAtMs: 1000 }
 onboardingState = applyObjectiveAutoAdvance(onboardingState, 1800).state
+assert.equal(onboardingState.step, 'choose')
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-chosen', 1800).state
 assert.equal(onboardingState.step, 'place')
-transition = applyOnboardingEvent(onboardingState, 'tower-placed', 1800)
+transition = applyOnboardingEvent(onboardingState, 'tower-placed', 1801)
 onboardingState = transition.state
 assert.equal(transition.didTransition, true)
-assert.equal(onboardingState.step, 'upgrade', 'tower placement advances from place only')
+assert.equal(onboardingState.step, 'inspect', 'tower placement advances to inspection')
 
 transition = applyOnboardingEvent(onboardingState, 'skip', 1900)
 assert.equal(transition.didTransition, true)
@@ -688,19 +784,14 @@ const completedConfigState = createOnboardingState(0, onboardingConfig, true)
 assert.equal(completedConfigState.step, 'complete')
 
 onboardingState = createOnboardingState(0, onboardingConfig, false)
-onboardingState = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state, 'tower-placed', 0).state
-assert.equal(onboardingState.step, 'upgrade')
-onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 1).state
-assert.equal(onboardingState.step, 'upgrade')
-
-onboardingState = createOnboardingState(0, onboardingConfig, false)
 onboardingState = applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-chosen', 0).state
 onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 0).state
-assert.equal(onboardingState.step, 'upgrade', 'tower placement advances into upgrade')
+assert.equal(onboardingState.step, 'inspect', 'tower placement advances into inspect')
 
-const finalUpgrade = applyOnboardingEvent(onboardingState, 'tower-upgraded', 0)
-assert.equal(finalUpgrade.didTransition, true)
-assert.equal(finalUpgrade.state.step, 'complete', 'upgrade from upgrade advances to complete')
+const finalInspection = applyOnboardingEvent(onboardingState, 'tower-selected', 0)
+assert.equal(finalInspection.didTransition, true)
+assert.equal(finalInspection.state.step, 'complete', 'inspection completes onboarding without an upgrade')
 
 let skippedFromPlace = createOnboardingState(0, onboardingConfig, false)
 skippedFromPlace = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...skippedFromPlace, autoAdvanceAtMs: 0 }, 0).state, 'skip', 0).state
@@ -709,9 +800,9 @@ assert.equal(skippedFromPlace.step, 'complete')
 const skippedFromObjective = createOnboardingState(0, onboardingConfig, false)
 assert.equal(applyOnboardingEvent(skippedFromObjective, 'skip', 0).state.step, 'complete')
 
-const skippedFromUpgrade = applyOnboardingEvent(applyOnboardingEvent(applyOnboardingEvent({ ...createOnboardingState(0, onboardingConfig, false), autoAdvanceAtMs: 0 }, 'objective-viewed', 0).state, 'tower-placed', 0).state, 'skip', 0)
-assert.equal(skippedFromUpgrade.didTransition, true)
-assert.equal(skippedFromUpgrade.state.step, 'complete')
+const skippedFromInspect = applyOnboardingEvent(onboardingState, 'skip', 0)
+assert.equal(skippedFromInspect.didTransition, true)
+assert.equal(skippedFromInspect.state.step, 'complete')
 
 const running = createRunState(100)
 assert.equal(isRunActive(running), true)
@@ -1067,6 +1158,108 @@ await initializePersistedAudioSettings({
   },
 })
 assert.equal(fallbackApplied, true)
+
+// accessibility settings + announcement throttling
+assert.deepEqual(createDefaultAccessibilitySettings(), { reducedEffects: false })
+assert.deepEqual(createDefaultAccessibilitySettings(true), { reducedEffects: true })
+assert.deepEqual(normalizeAccessibilitySettings({ reducedEffects: true }), {
+  reducedEffects: true,
+})
+assert.deepEqual(normalizeAccessibilitySettings({ reducedEffects: 'yes' }, true), {
+  reducedEffects: true,
+})
+assert.deepEqual(deserializeAccessibilitySettings(null, true), { reducedEffects: true })
+assert.deepEqual(deserializeAccessibilitySettings('bad', false), { reducedEffects: false })
+const serializedAccessibility = serializeAccessibilitySettings({ reducedEffects: true })
+assert.deepEqual(deserializeAccessibilitySettings(serializedAccessibility), {
+  reducedEffects: true,
+})
+
+const accessibilityValues = new Map()
+__setAccessibilitySettingsStorageAdapter({
+  async getItem(key) {
+    return accessibilityValues.get(key) ?? null
+  },
+  async setItem(key, value) {
+    accessibilityValues.set(key, value)
+  },
+})
+assert.deepEqual(await loadAccessibilitySettings(), { reducedEffects: false })
+assert.deepEqual(await setReducedEffects(true), { reducedEffects: true })
+assert.equal(isReducedEffectsEnabled(), true)
+const accessibilityClone = getAccessibilitySettings()
+accessibilityClone.reducedEffects = false
+assert.equal(isReducedEffectsEnabled(), true, 'accessibility store returns defensive clones')
+
+const throttleHistory = new Map([['hp-loss', 1000]])
+assert.equal(shouldAnnounce('raid-1', 1100, 1200, throttleHistory), true)
+assert.equal(shouldAnnounce('hp-loss', 1100, 1200, throttleHistory), false)
+assert.equal(shouldAnnounce('hp-loss', 2200, 1200, throttleHistory), true)
+
+// responsive viewport + portrait gate pause ownership
+const viewportPolicy = {
+  logicalWidth: 800,
+  logicalHeight: 480,
+  minimumLandscapeWidth: 667,
+  minimumLandscapeHeight: 375,
+}
+assert.deepEqual(calculateResponsiveViewport({ width: 800, height: 480 }, viewportPolicy), {
+  presentation: 'landscape-supported',
+  shouldBlockInput: false,
+  scale: 1,
+  canvasWidth: 800,
+  canvasHeight: 480,
+  offsetX: 0,
+  offsetY: 0,
+})
+assert.deepEqual(calculateResponsiveViewport({ width: 667, height: 375 }, viewportPolicy), {
+  presentation: 'landscape-supported',
+  shouldBlockInput: false,
+  scale: 0.78125,
+  canvasWidth: 625,
+  canvasHeight: 375,
+  offsetX: 21,
+  offsetY: 0,
+})
+assert.equal(
+  calculateResponsiveViewport({ width: 390, height: 844 }, viewportPolicy).presentation,
+  'portrait-gate',
+)
+assert.equal(
+  calculateResponsiveViewport({ width: 390, height: 844 }, viewportPolicy).shouldBlockInput,
+  true,
+)
+assert.equal(
+  calculateResponsiveViewport({ width: 600, height: 320 }, viewportPolicy).presentation,
+  'landscape-compact',
+)
+
+const gateFromRunning = resolveOrientationGate(createOrientationGateState(), true, 'running')
+assert.deepEqual(gateFromRunning, {
+  state: { active: true, ownsGameplayPause: true },
+  effect: 'pause-gameplay',
+})
+assert.deepEqual(resolveOrientationGate(gateFromRunning.state, false, 'paused'), {
+  state: { active: false, ownsGameplayPause: false },
+  effect: 'resume-gameplay',
+})
+const gateFromPaused = resolveOrientationGate(createOrientationGateState(), true, 'paused')
+assert.deepEqual(gateFromPaused, {
+  state: { active: true, ownsGameplayPause: false },
+  effect: 'none',
+})
+assert.deepEqual(resolveOrientationGate(gateFromPaused.state, false, 'paused'), {
+  state: { active: false, ownsGameplayPause: false },
+  effect: 'none',
+})
+assert.deepEqual(resolveOrientationGate(createOrientationGateState(), true, 'inactive'), {
+  state: { active: true, ownsGameplayPause: false },
+  effect: 'none',
+})
+assert.deepEqual(resolveOrientationGate(gateFromPaused.state, true, 'running'), {
+  state: { active: true, ownsGameplayPause: true },
+  effect: 'pause-gameplay',
+})
 
 // towerEconomyRules
 assert.equal(refundForTowerEconomy({ cost: 40, level: 1, upgradeCost: 25, investedCost: 150 }, 0.6), 90)

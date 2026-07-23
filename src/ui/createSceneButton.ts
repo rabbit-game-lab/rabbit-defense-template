@@ -17,6 +17,7 @@ export interface SceneButtonHandle {
   setEnabled(enabled: boolean): void
   setText(text: string): void
   setKeyboardFocus(focused: boolean): void
+  setVisible(visible: boolean): void
   trigger(): void
   destroy(): void
 }
@@ -167,6 +168,7 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
 
   return {
     setEnabled(enabled: boolean): void {
+      if (isDestroyed) return
       isEnabled = enabled
       isPressed = false
       isHovering = false
@@ -175,12 +177,21 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
     },
 
     setText(text: string): void {
+      if (isDestroyed) return
       label.setText(text)
     },
 
     setKeyboardFocus(focused: boolean): void {
+      if (isDestroyed) return
       isFocused = focused
       applyState()
+    },
+
+    setVisible(visible: boolean): void {
+      if (isDestroyed) return
+      bg.setVisible(visible)
+      label.setVisible(visible)
+      refreshEnabled(visible && isEnabled)
     },
 
     trigger(): void {
