@@ -1,3 +1,20 @@
+import { canAffordTower, refundForTower, spendCoins } from './towerEconomyRules.js'
+import {
+  type PlacementOutOfRangeReason,
+  type TowerEconomyLike,
+  type TowerPlacementCostLike,
+} from './towerEconomyRules.js'
+import {
+  computeTowerUpgrade,
+  createTowerUpgradePreview,
+  formatTowerUpgradePreview,
+  resolveTowerUpgradeRequest,
+  type TowerUpgradeDeltas,
+  type TowerUpgradePreview,
+  type TowerUpgradeRequestOutcome,
+  type TowerUpgradeStats,
+} from './towerUpgradeRules.js'
+
 export interface Point {
   x: number
   y: number
@@ -7,13 +24,6 @@ export interface BuildPadState {
   x: number
   y: number
   occupied: boolean
-}
-
-type PlacementOutOfRangeReason = 'outside-range' | 'occupied-pad' | 'insufficient-funds'
-
-export interface TowerPlacementCostLike {
-  towerName: string
-  cost: number
 }
 
 export interface PlacementDropOutcomeSuccess {
@@ -39,16 +49,6 @@ export interface PlacementProbe {
   nearestPad: BuildPadState | undefined
   validPad: BuildPadState | undefined
   valid: boolean
-}
-
-export interface TowerCostLike {
-  cost: number
-}
-
-export interface TowerEconomyLike {
-  cost: number
-  level: number
-  upgradeCost: number
 }
 
 export interface MovingEnemyState extends Point {
@@ -82,50 +82,24 @@ export interface DamageResult extends DamageableEnemy {
   killed: boolean
 }
 
-export interface TowerUpgradeStats {
-  level: number
-  damage: number
-  range: number
-  fireRateMs: number
-  upgradeCost: number
+export {
+  canAffordTower,
+  computeTowerUpgrade,
+  createTowerUpgradePreview,
+  formatTowerUpgradePreview,
+  refundForTower,
+  resolveTowerUpgradeRequest,
+  spendCoins,
 }
 
-export interface TowerUpgradeDeltas {
-  damage: number
-  range: number
-  fireRateMs: number
-}
-
-export interface TowerUpgradePreview {
-  next: TowerUpgradeStats
-  delta: TowerUpgradeDeltas
-  cost: number
-  summary: string
-}
-
-export type TowerUpgradeRequestOutcome = {
-    type: 'no-selection'
-    reason: 'no-selection'
-  } | {
-    type: 'insufficient-funds'
-    reason: 'insufficient-funds'
-    currentCoins: number
-    needed: number
-  } | {
-    type: 'success'
-    reason: 'success'
-    next: TowerUpgradeStats
-    cost: number
-    remainingCoins: number
-  }
-
-export interface ActiveSlow {
-  slowFactor: number
-  slowUntil: number
-}
-
-export function canAffordTower(coins: number, tower: TowerCostLike): boolean {
-  return coins >= tower.cost
+export type {
+  PlacementOutOfRangeReason,
+  TowerEconomyLike,
+  TowerPlacementCostLike,
+  TowerUpgradeDeltas,
+  TowerUpgradePreview,
+  TowerUpgradeRequestOutcome,
+  TowerUpgradeStats,
 }
 
 export function findNearestPadWithinRadius(
@@ -133,15 +107,18 @@ export function findNearestPadWithinRadius(
   pads: readonly BuildPadState[],
   radius: number,
 ): PlacementProbe {
-  const inRangePads = pads.filter((pad) => distanceBetween(pad, pointer) <= radius)
-  const sortedByDistance = inRangePads.sort((a, b) => distanceBetween(a, pointer) - distanceBetween(b, pointer))
-  const nearestPad = sortedByDistance[0]
-  const validPad = nearestPad && !nearestPad.occupied ? nearestPad : undefined
-  return {
-    nearestPad,
-    validPad,
-    valid: Boolean(validPad),
+  let nearestPad: BuildPadState | undefined
+  let nearestDistance = Infinity
+
+  for (const pad of pads) {
+    const distance = distanceBetween(pad, pointer)
+    if (distance > radius || distance >= nearestDistance) continue
+    nearestPad = pad
+    nearestDistance = distance
   }
+
+  const validPad = nearestPad && !nearestPad.occupied ? nearestPad : undefined
+  return { nearestPad, validPad, valid: Boolean(validPad) }
 }
 
 export function resolvePlacementDrop(
@@ -195,15 +172,6 @@ export function resolvePlacementDrop(
   }
 }
 
-export function spendCoins(coins: number, cost: number): number {
-  return Math.max(0, coins - cost)
-}
-
-export function refundForTower(tower: TowerEconomyLike): number {
-  const spent = tower.cost + Math.max(0, tower.level - 1) * tower.upgradeCost
-  return Math.floor(spent * 0.6)
-}
-
 export function distanceBetween(a: Point, b: Point): number {
   return Math.hypot(a.x - b.x, a.y - b.y)
 }
@@ -211,6 +179,11 @@ export function distanceBetween(a: Point, b: Point): number {
 function normalizeSlowFactor(value: number | undefined): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 1
   return Math.min(1, Math.max(0, value))
+}
+
+export interface ActiveSlow {
+  slowFactor: number
+  slowUntil: number
 }
 
 export function evaluateSlowImpact(active: ActiveSlow, incoming: ActiveSlow | undefined, now: number): ActiveSlow {
@@ -310,60 +283,21 @@ export function advanceEnemyAlongPath(enemy: MovingEnemyState, path: readonly Po
 }
 
 export function chooseTowerTarget<T extends TargetableEnemy>(tower: TowerTargeter, enemies: readonly T[]): T | undefined {
-  return enemies
-    .filter((enemy) => enemy.hp > 0 && !enemy.escaped && distanceBetween(tower, enemy) <= tower.range)
-    .sort((a, b) => b.pathIndex - a.pathIndex || b.progress - a.progress)[0]
-}
+  let best: T | undefined
 
-export function computeTowerUpgrade(tower: TowerUpgradeStats): TowerUpgradeStats {
-  return {
-    level: tower.level + 1,
-    damage: Math.round(tower.damage * 1.5),
-    range: tower.range + 10,
-    fireRateMs: Math.round(tower.fireRateMs * 0.9),
-    upgradeCost: Math.round(tower.upgradeCost * 1.5),
-  }
-}
+  for (const enemy of enemies) {
+    if (enemy.hp <= 0 || enemy.escaped) continue
+    if (distanceBetween(tower, enemy) > tower.range) continue
 
-export function createTowerUpgradePreview(tower: TowerUpgradeStats): TowerUpgradePreview {
-  const next = computeTowerUpgrade(tower)
-  const preview: TowerUpgradePreview = {
-    next,
-    delta: {
-      damage: next.damage - tower.damage,
-      range: next.range - tower.range,
-      fireRateMs: next.fireRateMs - tower.fireRateMs,
-    },
-    cost: tower.upgradeCost,
-    summary: `+${next.damage - tower.damage} Damage · +${next.range - tower.range} Range · ${next.fireRateMs - tower.fireRateMs}ms fire rate`,
-  }
-  return preview
-}
+    if (!best) {
+      best = enemy
+      continue
+    }
 
-export function resolveTowerUpgradeRequest(
-  selected: TowerUpgradeStats | null,
-  currentCoins: number,
-): TowerUpgradeRequestOutcome {
-  if (!selected) {
-    return { type: 'no-selection', reason: 'no-selection' }
+    if (enemy.pathIndex > best.pathIndex || (enemy.pathIndex === best.pathIndex && enemy.progress > best.progress)) {
+      best = enemy
+    }
   }
 
-  const next = computeTowerUpgrade(selected)
-  const cost = selected.upgradeCost
-
-  if (currentCoins < cost) {
-    return { type: 'insufficient-funds', reason: 'insufficient-funds', currentCoins, needed: cost }
-  }
-
-  return {
-    type: 'success',
-    reason: 'success',
-    next,
-    cost,
-    remainingCoins: Math.max(0, currentCoins - cost),
-  }
-}
-
-export function formatTowerUpgradePreview(preview: Pick<TowerUpgradePreview, 'summary'>): string {
-  return preview.summary
+  return best
 }

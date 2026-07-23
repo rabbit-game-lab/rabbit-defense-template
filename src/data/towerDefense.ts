@@ -18,6 +18,7 @@ export interface TowerDefinition {
   slowMs?: number
   splashRadius?: number
   upgradeCost: number
+  maxLevel: number
 }
 
 export interface EnemyDefinition {
@@ -72,6 +73,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     topColor: 0xf6d365,
     description: 'Fast single-target shots.',
     upgradeCost: 55,
+    maxLevel: 3,
   },
   frost: {
     type: 'frost',
@@ -87,6 +89,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     slowFactor: 0.55,
     slowMs: 1200,
     upgradeCost: 55,
+    maxLevel: 3,
   },
   bomb: {
     type: 'bomb',
@@ -101,6 +104,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     description: 'Slow splash damage.',
     splashRadius: 44,
     upgradeCost: 55,
+    maxLevel: 3,
   },
 }
 

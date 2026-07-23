@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import type { TowerDefinition, TowerType } from '../data/towerDefense'
+import { computeTowerLevelScale } from '../systems/towerPlacementVisuals'
 
 export interface TowerRuntime {
   id: string
@@ -9,6 +10,7 @@ export interface TowerRuntime {
   level: number
   cost: number
   upgradeCost: number
+  maxLevel: number
   damage: number
   range: number
   fireRateMs: number
@@ -46,11 +48,17 @@ export class TowerView {
 
   setLevel(level: number): void {
     this.levelText.setText(String(level))
-    this.container.setScale(1 + (level - 1) * 0.08)
+    const scale = computeTowerLevelScale(level)
+    this.base.setScale(scale)
+    this.roof.setScale(scale)
+    this.levelText.setScale(scale)
   }
 
+  setRange(range: number): void {
+    this.rangeCircle.setRadius(range)
+  }
   pulse(scene: Phaser.Scene): void {
-    scene.tweens.add({ targets: this.roof, scale: 1.2, duration: 70, yoyo: true })
+    scene.tweens.add({ targets: this.roof, scale: 1.2, yoyo: true })
   }
 
   destroy(): void {

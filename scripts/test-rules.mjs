@@ -158,6 +158,17 @@ const enemies = [
 ]
 assert.equal(chooseTowerTarget({ x: 100, y: 100, range: 90 }, enemies)?.id, 'runner')
 
+const first = { id: 'first', x: 132, y: 112, hp: 20, pathIndex: 2, progress: 30, escaped: false }
+const second = { id: 'second', x: 132, y: 112, hp: 5, pathIndex: 2, progress: 30, escaped: false }
+const tieSet = [second, first]
+assert.equal(chooseTowerTarget({ x: 132, y: 112, range: 40 }, tieSet)?.id, 'second', 'same priorities preserve stable identity by list order')
+
+const sameProgress = [
+  { id: 'later', x: 130, y: 100, hp: 20, pathIndex: 1, progress: 70, escaped: false },
+  { id: 'earlier', x: 100, y: 100, hp: 20, pathIndex: 1, progress: 30, escaped: false },
+]
+assert.equal(chooseTowerTarget({ x: 115, y: 100, range: 40 }, sameProgress)?.id, 'later', 'higher pathIndex then higher progress wins')
+
 assert.deepEqual(
   evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100),
   { slowFactor: 0.55, slowUntil: 1200 },
@@ -183,12 +194,13 @@ assert.deepEqual(
   { hp: 0, killed: true, slowFactor: 1, slowUntil: 0 },
   'damage clears expired slow state',
 )
-assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateMs: 700, upgradeCost: 50 }), {
+assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateMs: 700, upgradeCost: 50, maxLevel: 3 }), {
   level: 2,
   damage: 12,
   range: 100,
   fireRateMs: 630,
   upgradeCost: 75,
+  maxLevel: 3,
 })
 
 const upgradePreview = createTowerUpgradePreview({
@@ -197,6 +209,7 @@ const upgradePreview = createTowerUpgradePreview({
   range: 90,
   fireRateMs: 700,
   upgradeCost: 55,
+  maxLevel: 3,
 })
 assert.deepEqual(upgradePreview, {
   next: {
@@ -205,6 +218,7 @@ assert.deepEqual(upgradePreview, {
     range: 100,
     fireRateMs: 630,
     upgradeCost: 83,
+    maxLevel: 3,
   },
   delta: {
     damage: 4,
@@ -226,6 +240,7 @@ const unaffordable = resolveTowerUpgradeRequest(
     range: 90,
     fireRateMs: 700,
     upgradeCost: 60,
+    maxLevel: 4,
   },
   40,
 )
@@ -240,6 +255,7 @@ const affordableUpgrade = resolveTowerUpgradeRequest(
     range: 90,
     fireRateMs: 700,
     upgradeCost: 60,
+    maxLevel: 4,
   },
   60,
 )
@@ -251,9 +267,29 @@ assert.deepEqual(affordableUpgrade.next, {
   range: 100,
   fireRateMs: 630,
   upgradeCost: 90,
+  maxLevel: 4,
 })
 assert.equal(affordableUpgrade.cost, 60)
 assert.equal(affordableUpgrade.remainingCoins, 0)
+
+const atMax = resolveTowerUpgradeRequest(
+  {
+    level: 3,
+    damage: 20,
+    range: 128,
+    fireRateMs: 500,
+    upgradeCost: 150,
+    maxLevel: 3,
+  },
+  999,
+)
+assert.equal(atMax.type, 'max-level')
+assert.equal(atMax.reason, 'max-level')
+assert.equal(atMax.next.level, 3)
+assert.equal(atMax.cost, 0)
+assert.equal(atMax.remainingCoins, 999)
+assert.equal(atMax.upgradeCost, 150)
+assert.equal(atMax.maxed, true)
 
 assert.equal(formatTowerUpgradePreview(upgradePreview), '+4 Damage · +10 Range · -70ms fire rate')
 
