@@ -1,3 +1,4 @@
+import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
 import { PATH, WAVES } from '../data/towerDefense'
 import { EnemyView, type EnemyRuntime } from '../entities/EnemyView'
@@ -20,6 +21,8 @@ interface CombatCallbacks {
   onCoinsGain: (amount: number) => void
   onLivesLose: (amount: number) => boolean
   onStatusUpdate: (status: string) => void
+  onEnemyKilled?: () => void
+  onEnemyLeaked?: () => void
 }
 
 export default class CombatSystem {
@@ -181,6 +184,7 @@ export default class CombatSystem {
     enemy.view.destroy()
     this.callbacks.onStatusUpdate(`${enemy.name} reached the keep!`)
     const canContinue = this.callbacks.onLivesLose(enemy.leakDamage)
+    this.callbacks.onEnemyLeaked?.()
     playLeakSfx()
     return canContinue
   }
@@ -192,6 +196,7 @@ export default class CombatSystem {
     enemy.view.destroy()
     this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} coins.`)
     this.callbacks.onCoinsGain(enemy.reward)
+    this.callbacks.onEnemyKilled?.()
     playDefeatSfx()
   }
 

@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { CONFIG } from '../game.config'
 import { TOWERS, type TowerType } from '../data/towerDefense'
 import { createBuildPads, buildCards, type BuildPad } from './gameBoard'
 import {
@@ -9,6 +10,7 @@ import {
   type TowerUpgradeStats,
   type TowerUpgradePreview,
 } from './towerDefenseRules'
+import { refundForTower } from './towerEconomyRules'
 import { playBuildSfx, playClickSfx } from './audioManager'
 import { TowerView, type TowerRuntime } from '../entities/TowerView'
 import TowerPlacementDragController from './TowerPlacementDragController'
@@ -25,6 +27,8 @@ export interface TowerPlacementSelectedTower {
   affordable: boolean
   upgrade: TowerUpgradePreview
   maxed: boolean
+  sellRefund: number
+  sellEnabled: boolean
 }
 
 export interface TowerPlacementSnapshot {
@@ -38,6 +42,7 @@ interface TowerPlacementOptions {
   onStatusUpdate: (status: string) => void
   onTowerPlaced?: (towerType: TowerType) => void
   onTowerUpgraded?: () => void
+  onTowerSold?: (amount: number) => void
 }
 
 export default class TowerPlacementSystem {
@@ -82,6 +87,7 @@ export default class TowerPlacementSystem {
 
     const preview = createTowerUpgradePreview(selected)
     const upgradeRequest = this.resolveUpgradeRequest(selected, currentCoins)
+    const sellEnabled = this.options.canInteract()
 
     return {
       selectedTower: {
@@ -95,6 +101,8 @@ export default class TowerPlacementSystem {
         upgradeCost: selected.upgradeCost,
         affordable: upgradeRequest.type === 'success',
         maxed: preview.maxed ?? false,
+        sellEnabled,
+        sellRefund: refundForTower(selected, CONFIG.run.refundRatio),
         upgrade: {
           ...preview,
           cost: preview.cost,
@@ -107,6 +115,8 @@ export default class TowerPlacementSystem {
     this.scene.input.off('pointermove', this.handlePointerMove)
     this.scene.input.off('pointerup', this.handlePointerUp)
     this.dragController.clear()
+    for (const tower of this.towers) tower.view.destroy()
+    this.towers.length = 0
   }
 
   private startDrag(type: TowerType, pointer: Phaser.Input.Pointer): void {
@@ -155,6 +165,7 @@ export default class TowerPlacementSystem {
       x: pad.x,
       y: pad.y,
       level: 1,
+      investedCost: definition.cost,
       maxLevel: definition.maxLevel,
       upgradeCost: definition.upgradeCost,
       nextShotAt: 0,
@@ -203,6 +214,7 @@ export default class TowerPlacementSystem {
     }
 
     Object.assign(tower as TowerUpgradeStats, outcome.next)
+    tower!.investedCost = Math.max(0, tower!.investedCost + outcome.cost)
     tower!.view.setLevel(tower!.level)
     tower!.view.setRange(tower!.range)
     tower!.view.setSelected(true)
@@ -213,6 +225,31 @@ export default class TowerPlacementSystem {
       this.options.onTowerUpgraded()
     }
 
+    return true
+  }
+
+  sellSelectedTower(): boolean {
+    if (!this.options.canInteract()) {
+      this.options.onStatusUpdate('Cannot sell now.')
+      return false
+    }
+
+    const selected = this.towers.find((item) => item.id === this.selectedTowerId)
+    if (!selected) {
+      this.options.onStatusUpdate('Select a tower first to sell it.')
+      return false
+    }
+
+    const pad = this.findPadByTowerId(selected.id)
+    if (pad) pad.occupiedBy = undefined
+
+    const refund = refundForTower(selected, CONFIG.run.refundRatio)
+    this.towers.splice(this.towers.indexOf(selected), 1)
+    selected.view.destroy()
+    this.selectedTowerId = undefined
+
+    if (this.options.onTowerSold) this.options.onTowerSold(refund)
+    this.options.onStatusUpdate(`Sold ${TOWERS[selected.type].name} for ${refund} coins.`)
     return true
   }
 
@@ -235,6 +272,10 @@ export default class TowerPlacementSystem {
     }
 
     return resolveTowerUpgradeRequest(selected, currentCoins)
+  }
+
+  private findPadByTowerId(towerId: string): BuildPad | undefined {
+    return this.pads.find((pad) => pad.occupiedBy === towerId)
   }
 
   private selectTower(id: string): void {

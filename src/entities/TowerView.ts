@@ -9,6 +9,7 @@ export interface TowerRuntime {
   y: number
   level: number
   cost: number
+  investedCost: number
   upgradeCost: number
   maxLevel: number
   damage: number
