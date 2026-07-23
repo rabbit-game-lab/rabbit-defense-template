@@ -5,12 +5,17 @@ import { createBattleBackground, createHeader, drawPath } from '../systems/gameB
 import { playFanfareSfx } from '../systems/audioManager'
 import TowerPlacementSystem from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
+import type { WaveProgressSnapshot } from '../systems/waves'
 
 export interface HudState {
   coins: number
   lives: number
   wave: number
   totalWaves: number
+  wavePhase: WaveProgressSnapshot['phase']
+  enemiesToSpawn: number
+  activeEnemies: number
+  nextWaveInMs: number
   selectedTower: string
   status: string
 }
@@ -39,18 +44,6 @@ export default class GameScene extends Phaser.Scene {
     drawPath(this)
     createHeader(this)
 
-    this.placement = new TowerPlacementSystem(this, {
-      canInteract: () => isRunActive(this.runState),
-      spendCoins: (amount: number): boolean => {
-        if (this.coins < amount) return false
-        this.coins -= amount
-        return true
-      },
-      onStatusUpdate: (status) => {
-        this.status = status
-      },
-    })
-
     this.combat = new CombatSystem(this, {
       onCoinsGain: (amount: number) => {
         this.coins += amount
@@ -62,6 +55,21 @@ export default class GameScene extends Phaser.Scene {
       },
       onStatusUpdate: (status) => {
         this.status = status
+      },
+    })
+
+    this.placement = new TowerPlacementSystem(this, {
+      canInteract: () => isRunActive(this.runState),
+      spendCoins: (amount: number): boolean => {
+        if (this.coins < amount) return false
+        this.coins -= amount
+        return true
+      },
+      onStatusUpdate: (status) => {
+        this.status = status
+      },
+      onFirstTowerPlaced: () => {
+        this.combat.prepareFirstWave(this.time.now)
       },
     })
 
@@ -80,11 +88,16 @@ export default class GameScene extends Phaser.Scene {
   }
 
   getHudState(): HudState {
+    const waveProgress = this.combat.getWaveProgress()
     return {
       coins: this.coins,
       lives: this.lives,
-      wave: this.combat.currentWave,
-      totalWaves: this.combat.totalWaves,
+      wave: waveProgress.wave,
+      totalWaves: waveProgress.totalWaves,
+      wavePhase: waveProgress.phase,
+      enemiesToSpawn: waveProgress.toSpawnInCurrentWave,
+      activeEnemies: this.combat.activeEnemyCount,
+      nextWaveInMs: waveProgress.nextEventMs,
       selectedTower: this.placement.getSnapshot().selectedTowerText,
       status: this.status,
     }

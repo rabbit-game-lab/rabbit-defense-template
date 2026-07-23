@@ -13,6 +13,8 @@ import {
 import { createRunState, finishRun, getRunStatus, isRunActive } from '../.tmp-tests/src/systems/runState.js'
 import {
   createWaveState,
+  prepareFirstWave,
+  createWaveProgressSnapshot,
   isWaveRunComplete,
   markWaveEnemySpawned,
   nextWaveEnemy,
@@ -84,19 +86,30 @@ const waves = [
   { enemies: ['a', 'b'], spawnEveryMs: 100 },
   { enemies: ['c'], spawnEveryMs: 50 },
 ]
-const waveState = createWaveState(1000, 300)
-assert.equal(nextWaveEnemy(waveState, 999, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1000, waves), 'a', 'first enemy spawns exactly at startAt')
-markWaveEnemySpawned(waveState, 1000, waves)
-assert.equal(nextWaveEnemy(waveState, 1099, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1100, waves), 'b')
-markWaveEnemySpawned(waveState, 1100, waves)
+const waveState = createWaveState(1000, 300, 3000)
+assert.equal(nextWaveEnemy(waveState, 1000, waves), undefined, 'first wave is blocked until a tower is placed')
+assert.equal(createWaveProgressSnapshot(waveState, 1000, waves, 0).phase, 'preparing', 'snapshot starts in preparing')
+prepareFirstWave(waveState, 1500)
+assert.equal(nextWaveEnemy(waveState, 4499, waves), undefined, 'first tower signal schedules delayed first spawn')
+assert.equal(createWaveProgressSnapshot(waveState, 4499, waves, 0).nextEventMs, 1, 'countdown stays deterministic before first wave')
+assert.equal(nextWaveEnemy(waveState, 4500, waves), 'a', 'deterministic first-wave countdown of 3000ms')
+markWaveEnemySpawned(waveState, 4500, waves)
+assert.equal(createWaveProgressSnapshot(waveState, 4500, waves, 0).phase, 'active', 'first spawn puts wave in active phase')
+assert.equal(nextWaveEnemy(waveState, 4599, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 4600, waves), 'b')
+markWaveEnemySpawned(waveState, 4600, waves)
 assert.equal(waveState.waveIndex, 1)
-assert.equal(waveState.betweenWaveUntil, 1400)
-assert.equal(nextWaveEnemy(waveState, 1399, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1400, waves), 'c', 'configured cooldown gates the next wave')
-markWaveEnemySpawned(waveState, 1400, waves)
+assert.equal(waveState.betweenWaveUntil, 4900)
+assert.equal(createWaveProgressSnapshot(waveState, 4850, waves, 0).phase, 'between', 'between phase is explicit and timed')
+assert.equal(createWaveProgressSnapshot(waveState, 4850, waves, 0).nextEventMs, 50, 'next event countdown tracks delay before next wave')
+assert.equal(nextWaveEnemy(waveState, 4899, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 4900, waves), 'c', 'configured cooldown gates the next wave')
+markWaveEnemySpawned(waveState, 4900, waves)
 assert.equal(isWaveRunComplete(waveState, waves.length), true)
+const completeSnapshot = createWaveProgressSnapshot(waveState, 9999, waves, 0)
+assert.equal(completeSnapshot.phase, 'complete', 'complete phase at no waves left and no active enemies')
+assert.equal(completeSnapshot.nextEventMs, 0)
+assert.equal(completeSnapshot.toSpawnInCurrentWave, 0)
 assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })

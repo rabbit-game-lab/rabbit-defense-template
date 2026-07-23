@@ -18,6 +18,7 @@ interface TowerPlacementOptions {
   spendCoins: (amount: number) => boolean
   onStatusUpdate: (status: string) => void
   canInteract: () => boolean
+  onFirstTowerPlaced?: () => void
 }
 
 export default class TowerPlacementSystem {
@@ -29,6 +30,7 @@ export default class TowerPlacementSystem {
   private dragGhost?: Phaser.GameObjects.Container
   private selectedTowerId?: string
   private nextId = 1
+  private hasPlacedFirstTower = false
 
   private readonly handlePointerMove = (pointer: Phaser.Input.Pointer): void => this.moveDragGhost(pointer)
   private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => this.finishDrag(pointer)
@@ -128,6 +130,11 @@ export default class TowerPlacementSystem {
     view.container.on('pointerdown', () => this.selectOrUpgradeTower(tower.id))
     this.options.onStatusUpdate(`${definition.name} built. Tap it with enough coins to upgrade.`)
     playBuildSfx()
+
+    if (!this.hasPlacedFirstTower) {
+      this.hasPlacedFirstTower = true
+      this.options.onFirstTowerPlaced?.()
+    }
   }
 
   private selectOrUpgradeTower(id: string): void {

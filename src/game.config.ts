@@ -105,6 +105,14 @@ export const CONFIG = {
     // Related: build pad availability and player upgrading cadence.
     // Units: milliseconds.
     betweenWaveDelayMs: 2600,
+
+    // waves.firstWavePrepareDelayMs
+    // What: delay after first tower placement before the first wave spawns.
+    // Feel: gives players a guaranteed setup grace window to place initial defenses.
+    // Range: 500-8000 (default 3000).
+    // Related: run.startingCoins and build pad spacing.
+    // Units: milliseconds.
+    firstWavePrepareDelayMs: 3000,
   },
 
   combat: {
