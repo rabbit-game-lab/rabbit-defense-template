@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
+import { TOWER_TEXTURE_KEYS } from '../data/assets'
 import { TOWERS, type TowerType } from '../data/towerDefense'
 import type { BuildPad } from './gameBoard'
 import {
@@ -28,8 +29,7 @@ export default class TowerPlacementDragController {
   private draggingType?: TowerType
   private dragGhost?: Phaser.GameObjects.Container
   private dragGhostRange?: Phaser.GameObjects.Arc
-  private dragGhostBody?: Phaser.GameObjects.Rectangle
-  private dragGhostRoof?: Phaser.GameObjects.Triangle
+  private dragGhostSprite?: Phaser.GameObjects.Image
 
   constructor(scene: Phaser.Scene, pads: BuildPad[], options: DragControllerConfig) {
     this.scene = scene
@@ -58,16 +58,15 @@ export default class TowerPlacementDragController {
     this.dragGhostRange = this.scene.add
       .circle(0, 0, definition.range, ghostVisual.rangeFillColor, 0.1)
       .setStrokeStyle(1, ghostVisual.rangeStrokeColor, 0.18)
-    this.dragGhostBody = this.scene.add.rectangle(0, 2, 22, 26, ghostVisual.bodyFillColor, 0.82)
-    this.dragGhostRoof = this.scene.add.triangle(0, -16, -15, 8, 15, 8, 0, -12, ghostVisual.roofFillColor)
-    this.dragGhost.add([this.dragGhostRange, this.dragGhostBody, this.dragGhostRoof])
+    this.dragGhostSprite = this.scene.add.image(0, 0, TOWER_TEXTURE_KEYS[type]).setAlpha(0.9)
+    this.dragGhost.add([this.dragGhostRange, this.dragGhostSprite])
     this.setGhostColor(false)
 
     this.move(pointer)
   }
 
   move(pointer: Phaser.Input.Pointer): void {
-    if (!this.draggingType || !this.dragGhost || !this.dragGhostRange || !this.dragGhostBody || !this.dragGhostRoof) return
+    if (!this.draggingType || !this.dragGhost || !this.dragGhostRange || !this.dragGhostSprite) return
 
     if (!this.options.canInteract()) {
       this.options.onStatusUpdate('')
@@ -144,22 +143,20 @@ export default class TowerPlacementDragController {
   }
 
   private setGhostColor(valid: boolean): void {
-    if (!this.dragGhostRange || !this.dragGhostBody || !this.dragGhostRoof) return
+    if (!this.dragGhostRange || !this.dragGhostSprite) return
     const state = computeDragGhostStyle(valid)
 
     this.dragGhostRange
       .setFillStyle(state.rangeFillColor, 0.1)
       .setStrokeStyle(1, state.rangeStrokeColor, 0.36)
-    this.dragGhostBody.setFillStyle(state.bodyFillColor, 0.82)
-    this.dragGhostRoof.setFillStyle(state.roofFillColor, 1)
+    this.dragGhostSprite.setTint(valid ? 0xffffff : 0xe28b8b)
   }
 
   private clearGhostAndHighlights(): void {
     if (this.dragGhost) this.dragGhost.destroy()
     this.dragGhost = undefined
     this.dragGhostRange = undefined
-    this.dragGhostBody = undefined
-    this.dragGhostRoof = undefined
+    this.dragGhostSprite = undefined
 
     for (const pad of this.pads) {
       pad.ring.setFillStyle(PAD_FREE_COLOR, PAD_BASE_ALPHA)

@@ -17,9 +17,9 @@ export interface OnboardingTransition {
 }
 
 const ONBOARDING_INSTRUCTIONS: Record<OnboardingStep, string> = {
-  objective: 'Objective: defend the keep, then place and upgrade towers to survive all waves.',
-  place: 'Place one tower in a glowing build circle.',
-  upgrade: 'Upgrade your selected tower to continue.',
+  objective: 'Objective: defend Hidden Dojo, then place and upgrade ninja defenses to survive all raids.',
+  place: 'Place one defense on a glowing build seal.',
+  upgrade: 'Upgrade your selected defense to continue.',
   complete: '',
 } as const
 

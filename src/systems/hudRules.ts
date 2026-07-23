@@ -27,8 +27,8 @@ export function resolveHudStatus(
 
 export function getRunFallbackStatus(hasPlacedTower: boolean): string {
   return hasPlacedTower
-    ? 'Defend the keep — build or upgrade between waves.'
-    : 'Drag a tower from the shop to a build circle.'
+    ? 'Defend Hidden Dojo — build or upgrade between raids.'
+    : 'Drag a defense from the shop to a glowing seal.'
 }
 
 function isValidMessage(nowMs: number, message: TimedHudMessage | undefined): message is TimedHudMessage {
@@ -36,20 +36,20 @@ function isValidMessage(nowMs: number, message: TimedHudMessage | undefined): me
 }
 
 export function formatWaveHud(snapshot: WaveProgressSnapshot, activeEnemies: number): string {
-  if (snapshot.phase === 'complete') return 'All waves cleared'
+  if (snapshot.phase === 'complete') return 'All raids repelled'
 
   if (snapshot.phase === 'preparing') {
-    if (snapshot.nextEventMs <= 0) return 'Build your first tower'
-    return `Wave ${snapshot.wave} starts in ${Math.ceil(snapshot.nextEventMs / 1000)}s`
+    if (snapshot.nextEventMs <= 0) return 'Place your first ninja defense'
+    return `Raid ${snapshot.wave} starts in ${Math.ceil(snapshot.nextEventMs / 1000)}s`
   }
 
   if (snapshot.phase === 'active') {
-    return `Wave ${snapshot.wave} · ${snapshot.toSpawnInCurrentWave + activeEnemies} left`
+    return `Raid ${snapshot.wave} · ${snapshot.toSpawnInCurrentWave + activeEnemies} left`
   }
 
   if (activeEnemies === 0) {
-    return `Wave ${snapshot.wave} starts in ${Math.ceil(snapshot.nextEventMs / 1000)}s`
+    return `Raid ${snapshot.wave} starts in ${Math.ceil(snapshot.nextEventMs / 1000)}s`
   }
 
-  return `Wave ${snapshot.wave - 1} · ${activeEnemies} active · Next ${Math.ceil(snapshot.nextEventMs / 1000)}s`
+  return `Raid ${snapshot.wave - 1} · ${activeEnemies} active · Next ${Math.ceil(snapshot.nextEventMs / 1000)}s`
 }

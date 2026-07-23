@@ -70,7 +70,12 @@ import {
 } from '../.tmp-tests/src/systems/balanceSimulator.js'
 import { buildTimeoutResult } from '../.tmp-tests/src/systems/balanceSimulationOutcome.js'
 import { createSimulationState } from '../.tmp-tests/src/systems/balanceSimulationMath.js'
-import { ENEMIES as balanceEnemies, WAVES as balanceWaves } from '../.tmp-tests/src/data/towerDefense.js'
+import {
+  ENEMIES as balanceEnemies,
+  TOWERS as balanceTowers,
+  WAVES as balanceWaves,
+} from '../.tmp-tests/src/data/towerDefense.js'
+import { IMAGES as themeImages } from '../.tmp-tests/src/data/assets.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -79,6 +84,34 @@ const path = [
 ]
 
 const balanceStrategies = createBaselineStrategies()
+assert.deepEqual(
+  Object.values(balanceTowers).map((tower) => tower.name),
+  ['Shuriken Tower', 'Ice Shrine', 'Fire Mortar'],
+  'all tower-facing names follow the ninja theme',
+)
+assert.deepEqual(
+  Object.values(balanceEnemies).map((enemy) => enemy.name),
+  ['Scout Mouse', 'Rogue Raccoon', 'Iron Panda', 'Crimson Bear Shogun'],
+  'all enemy-facing names follow the ninja theme',
+)
+assert.deepEqual(
+  themeImages.map(({ key }) => key).sort(),
+  [
+    'enemy-boss',
+    'enemy-grunt',
+    'enemy-runner',
+    'enemy-tank',
+    'hidden-dojo',
+    'projectile-bomb',
+    'projectile-frost',
+    'projectile-shuriken',
+    'tower-bomb',
+    'tower-frost',
+    'tower-shuriken',
+    'world-board',
+  ],
+  'the ninja vertical slice declares every gameplay-critical image',
+)
 assert.equal(balanceWaves.length, 10, 'campaign contains exactly ten waves')
 assert.deepEqual(
   balanceWaves.slice(0, 5).map((wave) => wave.enemies),
@@ -94,8 +127,8 @@ assert.deepEqual(
 const bossWaves = balanceWaves
   .map((wave, index) => wave.enemies.includes('warden') ? index + 1 : null)
   .filter((wave) => wave !== null)
-assert.deepEqual(bossWaves, [10], 'Fortress Beetle appears only in the final wave')
-assert.equal(balanceEnemies.warden.slowResistance, 1, 'Fortress Beetle fully resists new slows')
+assert.deepEqual(bossWaves, [10], 'Crimson Bear Shogun appears only in the final raid')
+assert.equal(balanceEnemies.warden.slowResistance, 1, 'Crimson Bear Shogun fully resists new slows')
 assert.equal(
   buildTimeoutResult(createSimulationState(), balanceStrategies[0]).outcome,
   'timeout',
@@ -132,8 +165,8 @@ assert.equal(canAffordTower(50, { cost: 75 }), false)
 assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
-assert.equal(getRunFallbackStatus(false), 'Drag a tower from the shop to a build circle.')
-assert.equal(getRunFallbackStatus(true), 'Defend the keep — build or upgrade between waves.')
+assert.equal(getRunFallbackStatus(false), 'Drag a defense from the shop to a glowing seal.')
+assert.equal(getRunFallbackStatus(true), 'Defend Hidden Dojo — build or upgrade between raids.')
 assert.deepEqual(
   findNearestPadWithinRadius(
     { x: 5, y: 0 },
@@ -217,7 +250,7 @@ assert.equal(placementInsufficient.type, 'cancelled')
 assert.equal(placementInsufficient.reason, 'insufficient-funds')
 assert.equal(placementInsufficient.spendAmount, 0)
 assert.equal(placementInsufficient.nextCoins, 20)
-assert.equal(placementInsufficient.status, 'Need 50 coins to build Arrow Tower.')
+assert.equal(placementInsufficient.status, 'Need 50 ryo to build Arrow Tower.')
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 80, y: 0, pathIndex: 0, progress: 80 }, path, 50),
   { x: 100, y: 30, pathIndex: 1, progress: 30, escaped: false },
@@ -443,18 +476,20 @@ const mkSnapshot = (phase, nextEventMs, toSpawn, wave = 1, totalWaves = 5, activ
     active,
   )
 
-assert.equal(mkSnapshot('preparing', 0, 6), 'Build your first tower')
-assert.equal(mkSnapshot('preparing', 1200, 0), 'Wave 1 starts in 2s')
-assert.equal(mkSnapshot('active', 2000, 4, 3, 5, 1), 'Wave 3 · 5 left')
-assert.equal(mkSnapshot('between', 1000, 4, 4, 5, 0), 'Wave 4 starts in 1s')
-assert.equal(mkSnapshot('between', 2000, 4, 4, 5, 1), 'Wave 3 · 1 active · Next 2s')
-assert.equal(mkSnapshot('between', 2300, 4, 2, 5, 3), 'Wave 1 · 3 active · Next 3s')
-assert.equal(mkSnapshot('complete', 0, 0, 5, 5, 0), 'All waves cleared')
+assert.equal(mkSnapshot('preparing', 0, 6), 'Place your first ninja defense')
+assert.equal(mkSnapshot('preparing', 1200, 0), 'Raid 1 starts in 2s')
+assert.equal(mkSnapshot('active', 2000, 4, 3, 5, 1), 'Raid 3 · 5 left')
+assert.equal(mkSnapshot('between', 1000, 4, 4, 5, 0), 'Raid 4 starts in 1s')
+assert.equal(mkSnapshot('between', 2000, 4, 4, 5, 1), 'Raid 3 · 1 active · Next 2s')
+assert.equal(mkSnapshot('between', 2300, 4, 2, 5, 3), 'Raid 1 · 3 active · Next 3s')
+assert.equal(mkSnapshot('complete', 0, 0, 5, 5, 0), 'All raids repelled')
 
 const onboardingConfig = { objectiveAutoAdvanceMs: 1700 }
 let onboardingState = createOnboardingState(0, onboardingConfig, false)
 assert.equal(onboardingState.step, 'objective')
-assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: defend the keep, then place and upgrade towers to survive all waves.')
+assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: defend Hidden Dojo, then place and upgrade ninja defenses to survive all raids.')
+assert.equal(getOnboardingInstruction('place'), 'Place one defense on a glowing build seal.')
+assert.equal(getOnboardingInstruction('upgrade'), 'Upgrade your selected defense to continue.')
 
 onboardingState = applyObjectiveAutoAdvance(onboardingState, 1200).state
 assert.equal(onboardingState.step, 'objective')

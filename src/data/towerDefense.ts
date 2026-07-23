@@ -64,7 +64,7 @@ export const SHOP_TOWER_ORDER: readonly TowerType[] = ['arrow', 'frost', 'bomb']
 export const TOWERS: Record<TowerType, TowerDefinition> = {
   arrow: {
     type: 'arrow',
-    name: 'Arrow Tower',
+    name: 'Shuriken Tower',
     cost: 50,
     damage: 10,
     range: 118,
@@ -72,13 +72,13 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     projectileSpeed: 430,
     color: 0x8b5a2b,
     topColor: 0xf6d365,
-    description: 'Fast single-target shots.',
+    description: 'Fast single-target shuriken.',
     upgradeCost: 55,
     maxLevel: 3,
   },
   frost: {
     type: 'frost',
-    name: 'Frost Mage',
+    name: 'Ice Shrine',
     cost: 70,
     damage: 6,
     range: 104,
@@ -86,7 +86,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     projectileSpeed: 360,
     color: 0x385b83,
     topColor: 0xa9e8ff,
-    description: 'Slows monsters with low damage.',
+    description: 'Slows raiders with frozen seals.',
     slowFactor: 0.55,
     slowMs: 1200,
     upgradeCost: 55,
@@ -94,7 +94,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
   },
   bomb: {
     type: 'bomb',
-    name: 'Bombard',
+    name: 'Fire Mortar',
     cost: 95,
     damage: 18,
     range: 96,
@@ -102,7 +102,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     projectileSpeed: 320,
     color: 0x573016,
     topColor: 0xff9b54,
-    description: 'Slow splash damage.',
+    description: 'Slow explosive kunai damage.',
     splashRadius: 44,
     upgradeCost: 55,
     maxLevel: 3,
@@ -112,7 +112,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
 export const ENEMIES: Record<EnemyType, EnemyDefinition> = {
   grunt: {
    type: 'grunt',
-   name: 'Goblin',
+   name: 'Scout Mouse',
    hp: 26,
    speed: 46,
    reward: 9,
@@ -124,7 +124,7 @@ export const ENEMIES: Record<EnemyType, EnemyDefinition> = {
  },
   runner: {
    type: 'runner',
-   name: 'Imp Runner',
+   name: 'Rogue Raccoon',
    hp: 16,
    speed: 72,
    reward: 11,
@@ -136,7 +136,7 @@ export const ENEMIES: Record<EnemyType, EnemyDefinition> = {
  },
   tank: {
    type: 'tank',
-   name: 'Ogre',
+   name: 'Iron Panda',
    hp: 72,
    speed: 31,
    reward: 22,
@@ -148,7 +148,7 @@ export const ENEMIES: Record<EnemyType, EnemyDefinition> = {
  },
  warden: {
    type: 'warden',
-   name: 'Fortress Beetle',
+   name: 'Crimson Bear Shogun',
    hp: 220,
    speed: 24,
    reward: 160,

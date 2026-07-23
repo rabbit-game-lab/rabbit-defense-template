@@ -1,9 +1,10 @@
 import Phaser from 'phaser'
-import type { EnemyRuntime } from './EnemyView'
+import { PROJECTILE_TEXTURE_KEYS } from '../data/assets'
 import type { TowerType } from '../data/towerDefense'
+import type { EnemyRuntime } from './EnemyView'
 
 export interface ProjectileRuntime {
-  sprite: Phaser.GameObjects.Arc
+  sprite: Phaser.GameObjects.Image
   target: EnemyRuntime
   damage: number
   speed: number
@@ -13,12 +14,6 @@ export interface ProjectileRuntime {
   splashRadius?: number
 }
 
-export function createProjectile(scene: Phaser.Scene, x: number, y: number, type: TowerType): Phaser.GameObjects.Arc {
-  const colors: Record<TowerType, number> = {
-    arrow: 0xf6d365,
-    frost: 0xa9e8ff,
-    bomb: 0xff9b54,
-  }
-  const radius = type === 'bomb' ? 6 : 4
-  return scene.add.circle(x, y, radius, colors[type])
+export function createProjectile(scene: Phaser.Scene, x: number, y: number, type: TowerType): Phaser.GameObjects.Image {
+  return scene.add.image(x, y, PROJECTILE_TEXTURE_KEYS[type])
 }

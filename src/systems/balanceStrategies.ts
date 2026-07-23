@@ -50,7 +50,7 @@ function planBetweenWavesUpgrade(ctx: StrategyContext): StrategyAction | null {
 export function createBaselineStrategies(): StrategyDefinition[] {
   const arrowFrost: StrategyDefinition = {
     id: 'arrow-frost',
-    name: 'Arrow + Frost',
+    name: 'Shuriken + Ice',
     decide(ctx) {
       if (!hasType(ctx, 'arrow')) return { kind: 'place', towerType: 'arrow', padIndex: nextPadFromTowers(ctx) }
       if (!hasType(ctx, 'frost')) return { kind: 'place', towerType: 'frost', padIndex: nextPadFromTowers(ctx) }
@@ -60,7 +60,7 @@ export function createBaselineStrategies(): StrategyDefinition[] {
 
   const arrowBomb: StrategyDefinition = {
     id: 'arrow-bomb',
-    name: 'Arrow + Bombard',
+    name: 'Shuriken + Fire',
     decide(ctx) {
       if (!hasType(ctx, 'arrow')) return { kind: 'place', towerType: 'arrow', padIndex: nextPadFromTowers(ctx) }
       if (!hasType(ctx, 'bomb')) return { kind: 'place', towerType: 'bomb', padIndex: nextPadFromTowers(ctx) }
@@ -70,7 +70,7 @@ export function createBaselineStrategies(): StrategyDefinition[] {
 
   const arrowFocused: StrategyDefinition = {
     id: 'arrow-focused',
-    name: 'Arrow upgrades',
+    name: 'Shuriken upgrades',
     decide(ctx) {
       if (ctx.towers.length < 3) return { kind: 'place', towerType: 'arrow', padIndex: nextPadFromTowers(ctx) }
       if (!hasType(ctx, 'arrow')) return { kind: 'place', towerType: 'arrow', padIndex: nextPadFromTowers(ctx) }

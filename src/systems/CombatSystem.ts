@@ -188,7 +188,7 @@ export default class CombatSystem {
   private leakEnemy(enemy: EnemyRuntime): boolean {
     this.enemies = this.enemies.filter((item) => item !== enemy)
     enemy.view.destroy()
-    this.callbacks.onStatusUpdate(`${enemy.name} reached the keep!`)
+    this.callbacks.onStatusUpdate(`${enemy.name} breached Hidden Dojo!`)
     const canContinue = this.callbacks.onLivesLose(enemy.leakDamage)
     this.callbacks.onEnemyLeaked?.()
     playLeakSfx()
@@ -200,7 +200,7 @@ export default class CombatSystem {
 
     this.enemies = this.enemies.filter((item) => item !== enemy)
     enemy.view.destroy()
-    this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} coins.`)
+    this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} ryo.`)
     this.callbacks.onCoinsGain(enemy.reward)
     this.callbacks.onEnemyKilled?.()
     playDefeatSfx()
