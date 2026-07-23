@@ -1,6 +1,36 @@
 export const uiConfig = {
   panelColor: 0x1f2b20,
   textColor: '#fff4cf',
+  // What: Global UI dimensions shared across reusable components.
+  // Feel: Keep all interactive controls at or above touch-target minimum.
+  // Range: 44..140px for typical buttons.
+  // Related: createSceneButton helpers and menu/options overlays.
+  // Units: px (logical pixels).
+  buttonDefaults: {
+    minTouchablePx: 44,
+    borderThickness: 1,
+    defaultHeight: 48,
+    normalFill: 0x3a5a3d,
+    normalAlpha: 0.62,
+    hoverFill: 0x5b7c4d,
+    hoverAlpha: 0.8,
+    pressedFill: 0x7b9f74,
+    pressedAlpha: 1,
+    disabledFill: 0x2c3a2d,
+    disabledAlpha: 0.45,
+  },
+  mainMenu: {
+    titleFontSize: '34px',
+    subtitleFontSize: '18px',
+    titleColor: '#fff3bf',
+    subtitleColor: '#ffe5a8',
+    panelY: 56,
+    buttonY: 310,
+    buttonSpacing: 220,
+    backgroundTint: 0x000000,
+    backgroundAlpha: 0.45,
+    summaryOffsetY: 24,
+  },
   onboarding: {
     x: 400,
     y: 150,
@@ -12,6 +42,25 @@ export const uiConfig = {
   status: {
     placementMessageMs: 2600,
     combatMessageMs: 1200,
+  },
+  audioPanel: {
+    width: 640,
+    height: 280,
+    titleFontSize: '22px',
+    labelFontSize: '16px',
+    valueFontSize: '13px',
+    valueColor: '#ffe6a8',
+    panelColor: 0x1f2b20,
+    trackHeight: 16,
+    trackColor: 0x22331a,
+    fillColor: 0x70aa58,
+    thumbSize: 28,
+    thumbColor: 0x9fd07b,
+    marginX: 32,
+    marginY: 18,
+    closeButtonWidth: 118,
+    closeButtonHeight: 44,
+    closeButtonFontSize: '14px',
   },
   shop: {
     panelX: 684,

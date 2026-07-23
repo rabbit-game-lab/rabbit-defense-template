@@ -4,6 +4,7 @@ import { IMAGES } from '../data/assets'
 import { initializePersistedAudioSettings } from '../systems/audioStartup.js'
 import { applyAudioSettings } from '../systems/audioManager.js'
 import { loadAudioSettings } from '../systems/audioSettingsStore.js'
+import { resolveBootNextScene } from './flowContracts'
 
 export default class BootScene extends Phaser.Scene {
   private hasStartedNextScene = false
@@ -41,15 +42,18 @@ export default class BootScene extends Phaser.Scene {
         // Non-blocking: continue boot even when audio persistence is unavailable.
         applyAudioSettings({})
       } finally {
-        this.startNextScene()
+        const action = resolveBootNextScene(true)
+        if (action.type === 'start') {
+          this.startNextScene(action.nextScene)
+        }
       }
     })()
   }
 
-  private startNextScene(): void {
+  private startNextScene(nextScene: string): void {
     if (this.hasStartedNextScene) return
     this.hasStartedNextScene = true
-    this.scene.start('GameScene')
+    this.scene.start(nextScene)
   }
 
   private createLoadingBar(): void {

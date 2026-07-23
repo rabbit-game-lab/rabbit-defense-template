@@ -5,13 +5,14 @@
  */
 import Phaser from 'phaser'
 import BootScene from './BootScene'
+import MainMenuScene from './MainMenuScene'
 import GameScene from './GameScene'
 import UIScene from './UIScene'
 
-export const SCENES: Phaser.Types.Scenes.SceneType[] = [BootScene, GameScene, UIScene]
+export const SCENES: Phaser.Types.Scenes.SceneType[] = [BootScene, MainMenuScene, GameScene, UIScene]
 
 /**
  * Scene started when the platform sends `rabbit:restart`.
- * Point it at the menu scene once the game has one.
+ * Main menu is the canonical clean entry point.
  */
-export const RESTART_SCENE_KEY = 'GameScene'
+export const RESTART_SCENE_KEY = 'MainMenuScene'
