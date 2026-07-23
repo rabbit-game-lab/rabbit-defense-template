@@ -10,37 +10,75 @@ export default class UIScene extends Phaser.Scene {
   private upgradeButtonBg!: Phaser.GameObjects.Rectangle
   private upgradeButtonText!: Phaser.GameObjects.Text
   private upgradePreviewLine!: Phaser.GameObjects.Text
+  private upgradeEnabled = true
 
   constructor() {
     super('UIScene')
   }
 
   create(): void {
+    const hud = CONFIG.ui.hud
+    const upgradeButtonHeight = Math.max(hud.upgradeButtonHeight, 44)
+
     this.add
-      .rectangle(205, 24, 390, 38, CONFIG.ui.panelColor, 0.9)
+      .rectangle(hud.topRowX, hud.topRowY + hud.topRowHeight / 2, hud.topRowWidth, hud.topRowHeight, CONFIG.ui.panelColor, 0.9)
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.35)
-    this.statsLine = this.add.text(18, 12, '', { fontSize: '14px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
-    this.waveLine = this.add.text(258, 12, '', { fontSize: '14px', color: '#c8d8b6', fontStyle: 'bold' })
-
-    this.add.rectangle(402, 456, 760, 34, CONFIG.ui.panelColor, 0.86).setStrokeStyle(1, CONFIG.world.accentColor, 0.28)
-    this.selectedLine = this.add.text(28, 446, '', { fontSize: '12px', color: '#ffd56a', fontStyle: 'bold' })
-    this.statusLine = this.add.text(212, 446, '', { fontSize: '12px', color: CONFIG.ui.textColor })
-
-    this.upgradeButtonBg = this.add
-      .rectangle(700, 446, 150, 30, CONFIG.ui.panelColor, 0.95)
-      .setStrokeStyle(1, CONFIG.world.accentColor, 0.33)
-      .setInteractive({ useHandCursor: true })
-    this.upgradeButtonText = this.add.text(700, 440, '', {
-      fontSize: '11px',
+    this.statsLine = this.add.text(18, hud.topRowY + 2, '', {
+      fontSize: '14px',
       color: CONFIG.ui.textColor,
       fontStyle: 'bold',
     })
-    this.upgradeButtonText.setOrigin(0.5, 0)
+    this.waveLine = this.add.text(258, hud.topRowY + 2, '', {
+      fontSize: '14px',
+      color: CONFIG.ui.hud.infoTextColor,
+      fontStyle: 'bold',
+    })
 
-    this.upgradePreviewLine = this.add.text(620, 458, '', {
-      fontSize: '10px',
+    const bottomTop = hud.bottomY - hud.bottomHeight / 2
+    this.add
+      .rectangle(CONFIG.screen.width / 2, hud.bottomY, hud.bottomWidth, hud.bottomHeight, CONFIG.ui.panelColor, 0.86)
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.28)
+
+    this.selectedLine = this.add.text(hud.selectedTextX, bottomTop + hud.selectedLineY, '', {
+      fontSize: hud.selectedFontSize,
+      color: '#ffd56a',
+      fontStyle: 'bold',
+    })
+    this.statusLine = this.add.text(hud.statusTextX, bottomTop + hud.statusLineY, '', {
+      fontSize: hud.statusFontSize,
+      color: CONFIG.ui.textColor,
+    })
+    this.upgradePreviewLine = this.add.text(hud.statusTextX, bottomTop + hud.previewLineY, '', {
+      fontSize: hud.previewFontSize,
       color: '#ffd56a',
     })
+
+    this.upgradeButtonBg = this.add
+      .rectangle(
+        hud.upgradeButtonX,
+        hud.upgradeButtonY,
+        hud.upgradeButtonWidth,
+        Math.max(CONFIG.ui.hud.upgradeButtonHeight, 44),
+        CONFIG.ui.panelColor,
+        0.95,
+      )
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.33)
+      .setInteractive(new Phaser.Geom.Rectangle(-hud.upgradeButtonWidth / 2, -upgradeButtonHeight / 2, hud.upgradeButtonWidth, upgradeButtonHeight), Phaser.Geom.Rectangle.Contains)
+
+    this.upgradeButtonBg.on('pointerover', () => {
+      if (this.upgradeEnabled) this.input.setDefaultCursor('pointer')
+    })
+    this.upgradeButtonBg.on('pointerout', () => {
+      this.input.setDefaultCursor('default')
+    })
+
+    this.upgradeButtonText = this.add
+      .text(hud.upgradeButtonX, hud.upgradeButtonY, '', {
+        fontSize: hud.upgradeButtonFontSize,
+        color: CONFIG.ui.textColor,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0.5)
 
     this.upgradeButtonBg.on('pointerdown', () => {
       const gameScene = this.scene.get('GameScene') as GameScene
@@ -75,7 +113,11 @@ export default class UIScene extends Phaser.Scene {
   }
 
   private setUpgradeState(enabled: boolean): void {
+    this.upgradeEnabled = enabled
     this.upgradeButtonBg.setAlpha(enabled ? 1 : 0.45)
     this.upgradeButtonText.setColor(enabled ? CONFIG.ui.textColor : '#8b8f84')
+    if (!enabled) {
+      this.input.setDefaultCursor('default')
+    }
   }
 }
