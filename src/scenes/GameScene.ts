@@ -15,7 +15,13 @@ import { createBattleBackground, createHeader, drawPath } from '../systems/gameB
 import { playFanfareSfx } from '../systems/audioManager'
 import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
-import { createTimedHudMessage, resolveHudStatus, type TimedHudMessage, formatWaveHud } from '../systems/hudRules'
+import {
+  createTimedHudMessage,
+  formatWaveHud,
+  getRunFallbackStatus,
+  resolveHudStatus,
+  type TimedHudMessage,
+} from '../systems/hudRules'
 import type { WaveProgressSnapshot } from '../systems/waves'
 
 export interface HudState {
@@ -40,7 +46,7 @@ export default class GameScene extends Phaser.Scene {
   private lives: number = CONFIG.run.startingLives
   private placementMessage: TimedHudMessage | undefined
   private combatMessage: TimedHudMessage | undefined
-  private terminalStatus = 'Drag a tower from the shop to a build circle.'
+
   private runState: RunState = createRunState()
   private placement!: TowerPlacementSystem
   private combat!: CombatSystem
@@ -60,7 +66,6 @@ export default class GameScene extends Phaser.Scene {
     this.lives = CONFIG.run.startingLives
     this.placementMessage = undefined
     this.combatMessage = undefined
-    this.terminalStatus = 'Drag a tower from the shop to a build circle.'
 
     this.cameras.main.setBackgroundColor(CONFIG.world.backgroundColor)
     createBattleBackground(this)
@@ -137,7 +142,12 @@ export default class GameScene extends Phaser.Scene {
       activeEnemies: this.combat.activeEnemyCount,
       nextWaveInMs: waveProgress.nextEventMs,
       selectedTower: this.placement.getSnapshot(this.coins).selectedTower,
-      status: resolveHudStatus(this.time.now, this.placementMessage, this.combatMessage, this.terminalStatus),
+      status: resolveHudStatus(
+        this.time.now,
+        this.placementMessage,
+        this.combatMessage,
+        getRunFallbackStatus(this.hasPlacedFirstTower),
+      ),
       waveLabel: formatWaveHud(waveProgress, this.combat.activeEnemyCount),
       onboardingStep: this.onboardingState.step,
       onboardingInstruction: stepInstruction,
@@ -180,7 +190,7 @@ export default class GameScene extends Phaser.Scene {
     this.placement.destroy()
     this.placementMessage = undefined
     this.combatMessage = undefined
-    this.terminalStatus = didWin ? 'Victory! The rabbit keep is safe.' : 'Defeat! The monsters overran the keep.'
+
     const statusText = didWin ? 'Victory!' : 'Defeat!'
 
     this.add.rectangle(400, 240, 430, 130, 0x101610, 0.9).setStrokeStyle(2, CONFIG.world.accentColor)

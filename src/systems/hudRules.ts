@@ -25,6 +25,12 @@ export function resolveHudStatus(
   return fallback
 }
 
+export function getRunFallbackStatus(hasPlacedTower: boolean): string {
+  return hasPlacedTower
+    ? 'Defend the keep — build or upgrade between waves.'
+    : 'Drag a tower from the shop to a build circle.'
+}
+
 function isValidMessage(nowMs: number, message: TimedHudMessage | undefined): message is TimedHudMessage {
   return Boolean(message && message.expiresAtMs > nowMs)
 }

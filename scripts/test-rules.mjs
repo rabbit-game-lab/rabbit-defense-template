@@ -35,6 +35,7 @@ import {
 
 import {
   createTimedHudMessage,
+  getRunFallbackStatus,
   resolveHudStatus,
   formatWaveHud,
 } from '../.tmp-tests/src/systems/hudRules.js'
@@ -58,6 +59,8 @@ assert.equal(canAffordTower(50, { cost: 75 }), false)
 assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
+assert.equal(getRunFallbackStatus(false), 'Drag a tower from the shop to a build circle.')
+assert.equal(getRunFallbackStatus(true), 'Defend the keep — build or upgrade between waves.')
 assert.deepEqual(
   findNearestPadWithinRadius(
     { x: 5, y: 0 },
