@@ -37,8 +37,8 @@ export default class UIScene extends Phaser.Scene {
       color: CONFIG.ui.textColor,
       fontStyle: 'bold',
     })
-    this.waveLine = this.add.text(258, hud.topRowY + 2, '', {
-      fontSize: '14px',
+    this.waveLine = this.add.text(220, hud.topRowY + 2, '', {
+      fontSize: '12px',
       color: CONFIG.ui.hud.infoTextColor,
       fontStyle: 'bold',
     })
@@ -120,7 +120,7 @@ export default class UIScene extends Phaser.Scene {
 
     const hud: HudState = gameScene.getHudState()
     this.statsLine.setText(`Coins ${hud.coins}   Lives ${hud.lives}`)
-    this.waveLine.setText(`Wave ${hud.wave}/${hud.totalWaves}`)
+    this.waveLine.setText(hud.waveLabel)
 
     if (!hud.selectedTower) {
       this.selectedLine.setText('Selected: none')

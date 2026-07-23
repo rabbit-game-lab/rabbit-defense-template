@@ -34,6 +34,12 @@ import {
 } from '../.tmp-tests/src/systems/waveRules.js'
 
 import {
+  createTimedHudMessage,
+  resolveHudStatus,
+  formatWaveHud,
+} from '../.tmp-tests/src/systems/hudRules.js'
+
+import {
   applyOnboardingEvent,
   applyOnboardingPlayerAction,
   applyObjectiveAutoAdvance,
@@ -281,6 +287,39 @@ assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })
 
+assert.deepEqual(createTimedHudMessage(' ', 100, 1000), undefined)
+assert.deepEqual(createTimedHudMessage('Ready', 1000, 250), { text: 'Ready', expiresAtMs: 1250 })
+
+const now = 1000
+const placementMessage = createTimedHudMessage('Place tower here', now, 700)
+const combatMessage = createTimedHudMessage('Kill confirmed', now, 1000)
+const fallback = 'Stay calm'
+assert.equal(resolveHudStatus(now + 100, placementMessage, combatMessage, fallback), 'Place tower here', 'placement dominates while both valid')
+assert.equal(resolveHudStatus(now + 700, placementMessage, combatMessage, fallback), 'Kill confirmed', 'expiry boundary falls through to combat')
+assert.equal(resolveHudStatus(now + 900, placementMessage, combatMessage, fallback), 'Kill confirmed', 'combat appears when placement has expired')
+assert.equal(resolveHudStatus(now + 1300, placementMessage, combatMessage, fallback), fallback, 'fallback used after both temporary messages expire')
+assert.equal(resolveHudStatus(now + 1, undefined, undefined, fallback), fallback, 'fallback is always available')
+
+const mkSnapshot = (phase, nextEventMs, toSpawn, wave = 1, totalWaves = 5, active = 0) =>
+  formatWaveHud(
+    {
+      wave,
+      totalWaves,
+      phase,
+      toSpawnInCurrentWave: toSpawn,
+      nextEventMs,
+    },
+    active,
+  )
+
+assert.equal(mkSnapshot('preparing', 0, 6), 'Build your first tower')
+assert.equal(mkSnapshot('preparing', 1200, 0), 'Wave 1 starts in 2s')
+assert.equal(mkSnapshot('active', 2000, 4, 3, 5, 1), 'Wave 3 · 5 left')
+assert.equal(mkSnapshot('between', 1000, 4, 4, 5, 0), 'Wave 4 starts in 1s')
+assert.equal(mkSnapshot('between', 2000, 4, 4, 5, 1), 'Wave 3 · 1 active · Next 2s')
+assert.equal(mkSnapshot('between', 2300, 4, 2, 5, 3), 'Wave 1 · 3 active · Next 3s')
+assert.equal(mkSnapshot('complete', 0, 0, 5, 5, 0), 'All waves cleared')
+
 const onboardingConfig = { objectiveAutoAdvanceMs: 1700 }
 let onboardingState = createOnboardingState(0, onboardingConfig, false)
 assert.equal(onboardingState.step, 'objective')
@@ -355,4 +394,4 @@ const repeated = finishRun(victory.state, 'defeat', 900)
 assert.equal(repeated.didTransition, false, 'terminal transition is idempotent')
 assert.equal(repeated.state, victory.state, 'repeated finish preserves the original object and outcome')
 
-console.log('towerDefenseRules, waveRules, onboardingRules, and runState tests passed')
+console.log('towerDefenseRules, waveRules, onboardingRules, hudRules, and runState tests passed')

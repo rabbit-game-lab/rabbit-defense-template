@@ -95,7 +95,6 @@ export default class CombatSystem {
       view,
     })
     markEnemySpawned(this.waveState, now)
-    this.callbacks.onStatusUpdate(`Wave ${Math.min(this.waveState.waveIndex + 1, this.totalWaves)} incoming!`)
   }
 
   private updateEnemies(delta: number, now: number): boolean {

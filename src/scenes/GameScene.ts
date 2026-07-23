@@ -15,6 +15,7 @@ import { createBattleBackground, createHeader, drawPath } from '../systems/gameB
 import { playFanfareSfx } from '../systems/audioManager'
 import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
+import { createTimedHudMessage, resolveHudStatus, type TimedHudMessage, formatWaveHud } from '../systems/hudRules'
 import type { WaveProgressSnapshot } from '../systems/waves'
 
 export interface HudState {
@@ -30,14 +31,16 @@ export interface HudState {
   status: string
   onboardingStep: OnboardingStep
   onboardingInstruction: string
+  waveLabel: string
 }
 
 export default class GameScene extends Phaser.Scene {
   private static onboardingCompletedInSession = false
-
   private coins: number = CONFIG.run.startingCoins
   private lives: number = CONFIG.run.startingLives
-  private status = 'Drag a tower from the shop to a build circle.'
+  private placementMessage: TimedHudMessage | undefined
+  private combatMessage: TimedHudMessage | undefined
+  private terminalStatus = 'Drag a tower from the shop to a build circle.'
   private runState: RunState = createRunState()
   private placement!: TowerPlacementSystem
   private combat!: CombatSystem
@@ -55,7 +58,9 @@ export default class GameScene extends Phaser.Scene {
 
     this.coins = CONFIG.run.startingCoins
     this.lives = CONFIG.run.startingLives
-    this.status = 'Drag a tower from the shop to a build circle.'
+    this.placementMessage = undefined
+    this.combatMessage = undefined
+    this.terminalStatus = 'Drag a tower from the shop to a build circle.'
 
     this.cameras.main.setBackgroundColor(CONFIG.world.backgroundColor)
     createBattleBackground(this)
@@ -72,7 +77,7 @@ export default class GameScene extends Phaser.Scene {
         return this.lives > 0
       },
       onStatusUpdate: (status) => {
-        this.status = status
+        this.combatMessage = createTimedHudMessage(status, this.time.now, CONFIG.ui.status.combatMessageMs)
       },
     })
 
@@ -85,7 +90,10 @@ export default class GameScene extends Phaser.Scene {
         return true
       },
       onStatusUpdate: (status) => {
-        this.status = status
+        this.placementMessage = createTimedHudMessage(status, this.time.now, CONFIG.ui.status.placementMessageMs)
+        if (!status.trim()) {
+          this.placementMessage = undefined
+        }
       },
       onTowerPlaced: () => {
         this.handleOnboardingEvent('tower-placed')
@@ -129,7 +137,8 @@ export default class GameScene extends Phaser.Scene {
       activeEnemies: this.combat.activeEnemyCount,
       nextWaveInMs: waveProgress.nextEventMs,
       selectedTower: this.placement.getSnapshot(this.coins).selectedTower,
-      status: this.status,
+      status: resolveHudStatus(this.time.now, this.placementMessage, this.combatMessage, this.terminalStatus),
+      waveLabel: formatWaveHud(waveProgress, this.combat.activeEnemyCount),
       onboardingStep: this.onboardingState.step,
       onboardingInstruction: stepInstruction,
     }
@@ -169,9 +178,10 @@ export default class GameScene extends Phaser.Scene {
     if (!didTransition) return
 
     this.placement.destroy()
-
+    this.placementMessage = undefined
+    this.combatMessage = undefined
+    this.terminalStatus = didWin ? 'Victory! The rabbit keep is safe.' : 'Defeat! The monsters overran the keep.'
     const statusText = didWin ? 'Victory!' : 'Defeat!'
-    this.status = didWin ? 'Victory! The rabbit keep is safe.' : 'Defeat! The monsters overran the keep.'
 
     this.add.rectangle(400, 240, 430, 130, 0x101610, 0.9).setStrokeStyle(2, CONFIG.world.accentColor)
     this.add

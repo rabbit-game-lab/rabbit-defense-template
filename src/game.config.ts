@@ -115,6 +115,11 @@ export const CONFIG = {
       objectiveAutoAdvanceMs: 1700,
     },
 
+    status: {
+      placementMessageMs: 2600,
+      combatMessageMs: 1200,
+    },
+
     shop: {
       // Panel bounds must remain within the fixed 800x480 canvas.
       panelX: 684,
@@ -221,10 +226,10 @@ export const CONFIG = {
       // ui.hud.topRowWidth
       // What: width of the top status strip.
       // Feel: wider strips reduce clutter.
-      // Range: 340-440 (default 390).
-      // Related: screen.width.
+      // Range: 390-540 (default 540).
+      // Related: screen.width and ui.shop.panelX.
       // Units: pixels.
-      topRowWidth: 390,
+      topRowWidth: 540,
 
       // ui.hud.topRowHeight
       // What: height of the top status strip.
@@ -236,9 +241,9 @@ export const CONFIG = {
       // ui.hud.topRowX
       // What: horizontal center of top panel.
       // Feel: keeping center-left preserves path visibility.
-      // Range: 150-260 (default 205).
+      // Range: 205-280 (default 280).
       // Units: pixels.
-      topRowX: 205,
+      topRowX: 280,
 
       // Center of bottom strip; bounds stay inside y=422-478.
       bottomY: 450,
