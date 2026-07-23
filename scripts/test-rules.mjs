@@ -33,6 +33,14 @@ import {
   scaleEnemyStats,
 } from '../.tmp-tests/src/systems/waveRules.js'
 
+import {
+  applyOnboardingEvent,
+  applyOnboardingPlayerAction,
+  applyObjectiveAutoAdvance,
+  createOnboardingState,
+  getOnboardingInstruction,
+} from '../.tmp-tests/src/systems/onboardingRules.js'
+
 const path = [
   { x: 0, y: 0 },
   { x: 100, y: 0 },
@@ -273,6 +281,70 @@ assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })
 
+const onboardingConfig = { objectiveAutoAdvanceMs: 1700 }
+let onboardingState = createOnboardingState(0, onboardingConfig, false)
+assert.equal(onboardingState.step, 'objective')
+assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: defend the keep, then place and upgrade towers to survive all waves.')
+
+onboardingState = applyObjectiveAutoAdvance(onboardingState, 1200).state
+assert.equal(onboardingState.step, 'objective')
+assert.equal(applyObjectiveAutoAdvance(onboardingState, 1700).state.step, 'place', 'objective auto-advances after configured delay')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-upgraded', 2000).state
+assert.equal(onboardingState.step, 'objective', 'upgrades do not advance objective')
+
+let transition = applyOnboardingEvent(onboardingState, 'tower-placed', 2500)
+assert.equal(transition.didTransition, false, 'placement cannot advance before objective deadline')
+assert.equal(transition.state.step, 'objective')
+
+const fastPlacement = applyOnboardingPlayerAction(createOnboardingState(0, onboardingConfig, false), 'tower-placed', 250)
+assert.equal(fastPlacement.didTransition, true)
+assert.equal(fastPlacement.state.step, 'upgrade', 'early placement acknowledges objective and completes placement step')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = { ...onboardingState, autoAdvanceAtMs: 1000 }
+onboardingState = applyObjectiveAutoAdvance(onboardingState, 1800).state
+assert.equal(onboardingState.step, 'place')
+transition = applyOnboardingEvent(onboardingState, 'tower-placed', 1800)
+onboardingState = transition.state
+assert.equal(transition.didTransition, true)
+assert.equal(onboardingState.step, 'upgrade', 'tower placement advances from place only')
+
+transition = applyOnboardingEvent(onboardingState, 'skip', 1900)
+assert.equal(transition.didTransition, true)
+assert.equal(transition.state.step, 'complete')
+assert.equal(applyOnboardingEvent(transition.state, 'skip', 2000).didTransition, false, 'complete is immutable')
+
+const completedConfigState = createOnboardingState(0, onboardingConfig, true)
+assert.equal(completedConfigState.step, 'complete')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state, 'tower-placed', 0).state
+assert.equal(onboardingState.step, 'upgrade')
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 1).state
+assert.equal(onboardingState.step, 'upgrade')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 0).state
+assert.equal(onboardingState.step, 'upgrade', 'tower placement advances into upgrade')
+
+const finalUpgrade = applyOnboardingEvent(onboardingState, 'tower-upgraded', 0)
+assert.equal(finalUpgrade.didTransition, true)
+assert.equal(finalUpgrade.state.step, 'complete', 'upgrade from upgrade advances to complete')
+
+let skippedFromPlace = createOnboardingState(0, onboardingConfig, false)
+skippedFromPlace = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...skippedFromPlace, autoAdvanceAtMs: 0 }, 0).state, 'skip', 0).state
+assert.equal(skippedFromPlace.step, 'complete')
+
+const skippedFromObjective = createOnboardingState(0, onboardingConfig, false)
+assert.equal(applyOnboardingEvent(skippedFromObjective, 'skip', 0).state.step, 'complete')
+
+const skippedFromUpgrade = applyOnboardingEvent(applyOnboardingEvent(applyOnboardingEvent({ ...createOnboardingState(0, onboardingConfig, false), autoAdvanceAtMs: 0 }, 'objective-viewed', 0).state, 'tower-placed', 0).state, 'skip', 0)
+assert.equal(skippedFromUpgrade.didTransition, true)
+assert.equal(skippedFromUpgrade.state.step, 'complete')
+
 const running = createRunState(100)
 assert.equal(isRunActive(running), true)
 assert.equal(getRunStatus(running), 'running')
@@ -283,4 +355,4 @@ const repeated = finishRun(victory.state, 'defeat', 900)
 assert.equal(repeated.didTransition, false, 'terminal transition is idempotent')
 assert.equal(repeated.state, victory.state, 'repeated finish preserves the original object and outcome')
 
-console.log('towerDefenseRules, waveRules, and runState tests passed')
+console.log('towerDefenseRules, waveRules, onboardingRules, and runState tests passed')

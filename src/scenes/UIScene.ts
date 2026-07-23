@@ -1,8 +1,17 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import type GameScene from './GameScene'
+import type { HudState } from './GameScene'
+
+interface GameSceneBridge {
+  getHudState: () => HudState
+  upgradeSelectedTower: () => boolean
+}
 
 export default class UIScene extends Phaser.Scene {
+  private readonly onboardingPanel = {
+    bg: undefined as Phaser.GameObjects.Rectangle | undefined,
+    text: undefined as Phaser.GameObjects.Text | undefined,
+  }
   private statsLine!: Phaser.GameObjects.Text
   private waveLine!: Phaser.GameObjects.Text
   private selectedLine!: Phaser.GameObjects.Text
@@ -53,6 +62,21 @@ export default class UIScene extends Phaser.Scene {
       color: '#ffd56a',
     })
 
+    const onboarding = CONFIG.ui.onboarding
+    this.onboardingPanel.bg = this.add
+      .rectangle(onboarding.x, onboarding.y, onboarding.width, onboarding.height, CONFIG.ui.panelColor, 0.95)
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.35)
+    this.onboardingPanel.text = this.add
+      .text(onboarding.x, onboarding.y, '', {
+        fontSize: onboarding.textSize,
+        color: CONFIG.ui.textColor,
+        align: 'center',
+        wordWrap: { width: Math.max(260, onboarding.width - 16) },
+      })
+      .setOrigin(0.5)
+
+    this.onboardingPanel.text.setLineSpacing(1)
+
     this.upgradeButtonBg = this.add
       .rectangle(
         hud.upgradeButtonX,
@@ -63,7 +87,10 @@ export default class UIScene extends Phaser.Scene {
         0.95,
       )
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.33)
-      .setInteractive(new Phaser.Geom.Rectangle(-hud.upgradeButtonWidth / 2, -upgradeButtonHeight / 2, hud.upgradeButtonWidth, upgradeButtonHeight), Phaser.Geom.Rectangle.Contains)
+      .setInteractive(
+        new Phaser.Geom.Rectangle(-hud.upgradeButtonWidth / 2, -upgradeButtonHeight / 2, hud.upgradeButtonWidth, upgradeButtonHeight),
+        Phaser.Geom.Rectangle.Contains,
+      )
 
     this.upgradeButtonBg.on('pointerover', () => {
       if (this.upgradeEnabled) this.input.setDefaultCursor('pointer')
@@ -81,17 +108,17 @@ export default class UIScene extends Phaser.Scene {
       .setOrigin(0.5, 0.5)
 
     this.upgradeButtonBg.on('pointerdown', () => {
-      const gameScene = this.scene.get('GameScene') as GameScene
+      const gameScene = this.scene.get('GameScene') as Phaser.Scene & GameSceneBridge
       if (!gameScene.scene.isActive()) return
       gameScene.upgradeSelectedTower()
     })
   }
 
   update(): void {
-    const gameScene = this.scene.get('GameScene') as GameScene
+    const gameScene = this.scene.get('GameScene') as Phaser.Scene & GameSceneBridge
     if (!gameScene.scene.isActive()) return
 
-    const hud = gameScene.getHudState()
+    const hud: HudState = gameScene.getHudState()
     this.statsLine.setText(`Coins ${hud.coins}   Lives ${hud.lives}`)
     this.waveLine.setText(`Wave ${hud.wave}/${hud.totalWaves}`)
 
@@ -110,6 +137,17 @@ export default class UIScene extends Phaser.Scene {
     }
 
     this.statusLine.setText(hud.status)
+    this.renderOnboarding(hud)
+  }
+
+  private renderOnboarding(hud: HudState): void {
+    if (!this.onboardingPanel.bg || !this.onboardingPanel.text) return
+    const shouldShow = hud.onboardingStep !== 'complete'
+    this.onboardingPanel.bg.setVisible(shouldShow)
+    this.onboardingPanel.text.setVisible(shouldShow)
+    if (!shouldShow) return
+
+    this.onboardingPanel.text.setText(hud.onboardingInstruction)
   }
 
   private setUpgradeState(enabled: boolean): void {

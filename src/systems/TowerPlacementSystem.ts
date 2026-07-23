@@ -52,7 +52,8 @@ interface TowerPlacementOptions {
   getCurrentCoins: () => number
   spendCoins: (amount: number) => boolean
   onStatusUpdate: (status: string) => void
-  onFirstTowerPlaced?: () => void
+  onTowerPlaced?: (towerType: TowerType) => void
+  onTowerUpgraded?: () => void
 }
 
 export default class TowerPlacementSystem {
@@ -67,7 +68,6 @@ export default class TowerPlacementSystem {
   private dragGhostRoof?: Phaser.GameObjects.Triangle
   private selectedTowerId?: string
   private nextId = 1
-  private hasPlacedFirstTower = false
 
   private readonly handlePointerMove = (pointer: Phaser.Input.Pointer): void => this.moveDragGhost(pointer)
   private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => this.finishDrag(pointer)
@@ -308,9 +308,8 @@ export default class TowerPlacementSystem {
     view.container.on('pointerdown', () => this.selectTower(tower.id))
     playBuildSfx()
 
-    if (!this.hasPlacedFirstTower) {
-      this.hasPlacedFirstTower = true
-      this.options.onFirstTowerPlaced?.()
+    if (this.options.onTowerPlaced) {
+      this.options.onTowerPlaced(definition.type)
     }
   }
 
@@ -344,6 +343,9 @@ export default class TowerPlacementSystem {
     tower!.view.setSelected(true)
     this.options.onStatusUpdate(`${TOWERS[tower!.type].name} upgraded to level ${tower!.level}.`)
     playBuildSfx()
+    if (this.options.onTowerUpgraded) {
+      this.options.onTowerUpgraded()
+    }
     return true
   }
 

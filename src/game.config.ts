@@ -105,6 +105,16 @@ export const CONFIG = {
     // Units: CSS color string.
     textColor: '#fff4cf',
 
+    // Non-modal first-run callout; bounds 170-630 x 132-168.
+    onboarding: {
+      x: 400,
+      y: 150,
+      width: 460,
+      height: 36,
+      textSize: '13px',
+      objectiveAutoAdvanceMs: 1700,
+    },
+
     shop: {
       // Panel bounds must remain within the fixed 800x480 canvas.
       panelX: 684,
