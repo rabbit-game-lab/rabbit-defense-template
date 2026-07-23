@@ -1,19 +1,14 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import { SHOP_TOWER_ORDER, TOWERS, type TowerType } from '../data/towerDefense'
-import { createBuildPads, buildCards, type BuildPad } from './gameBoard'
-import {
-  createTowerUpgradePreview,
-  resolveTowerUpgradeRequest,
-  type PlacementDropOutcome,
-  type TowerUpgradeRequestOutcome,
-  type TowerUpgradeStats,
-  type TowerUpgradePreview,
-} from './towerDefenseRules'
+import { SHOP_TOWER_ORDER, TOWERS, type TowerDefinition, type TowerType } from '../data/towerDefense'
+import type { PlacementEvaluation, PlacedTowerAnchor } from '../data/terrain'
+import { buildCards, type ShopCard } from './gameBoard'
+import { evaluateTerrainPlacement } from './terrainPlacementRules'
+import { createTowerUpgradePreview, resolveTowerUpgradeRequest, type TowerUpgradeStats } from './towerDefenseRules'
 import { refundForTower } from './towerEconomyRules'
 import { playBuildSfx, playClickSfx } from './audioManager'
 import { TowerView, type TowerRuntime } from '../entities/TowerView'
-import TowerPlacementDragController from './TowerPlacementDragController'
+import { TerrainPlacementPreview } from './TerrainPlacementPreview'
 
 export interface TowerPlacementSelectedTower {
   id: string
@@ -25,7 +20,7 @@ export interface TowerPlacementSelectedTower {
   fireRateMs: number
   upgradeCost: number
   affordable: boolean
-  upgrade: TowerUpgradePreview
+  upgrade: ReturnType<typeof createTowerUpgradePreview>
   maxed: boolean
   sellRefund: number
   sellEnabled: boolean
@@ -34,66 +29,52 @@ export interface TowerPlacementSelectedTower {
 export interface TowerPlacementSnapshot {
   selectedTower: TowerPlacementSelectedTower | null
   pendingTowerType: TowerType | null
-  shop: Array<{
-    type: TowerType
-    name: string
-    role: string
-    cost: number
-    affordable: boolean
-    shortfall: number
-  }>
-  pads: Array<{ id: string; occupied: boolean }>
+  cursor: PlacementEvaluation | null
+  anchors: PlacedTowerAnchor[]
+  towerCount: number
+  towerMaximum: number
+  spacingLabels: Record<TowerType, string>
+  shop: Array<{ type: TowerType; name: string; role: string; cost: number; affordable: boolean; shortfall: number }>
   towerIds: string[]
 }
 
 interface TowerPlacementOptions {
   canInteract: () => boolean
   getCurrentCoins: () => number
+  getOnboardingVisible: () => boolean
   spendCoins: (amount: number) => boolean
   onStatusUpdate: (status: string) => void
-  onTowerPlaced?: (towerType: TowerType) => void
+  onTowerPlaced?: (towerType: TowerType, x: number, y: number) => void
   onTowerChosen?: (towerType: TowerType) => void
   onTowerSelected?: (towerId: string) => void
   onTowerUpgraded?: () => void
   onTowerSold?: (amount: number) => void
 }
 
+interface CardGesture {
+  type: TowerType
+  pointerId: number
+  startX: number
+  startY: number
+  dragging: boolean
+}
+
 export default class TowerPlacementSystem {
-  private readonly scene: Phaser.Scene
-  private readonly options: TowerPlacementOptions
-  private readonly pads: BuildPad[]
   private readonly towers: TowerRuntime[] = []
-  private readonly dragController: TowerPlacementDragController
+  private readonly preview: TerrainPlacementPreview
+  private readonly shopCards: ShopCard[]
   private selectedTowerId?: string
   private pendingTowerType?: TowerType
+  private cursorX = 16 + CONFIG.placement.cellSize * CONFIG.placement.cursorStartColumn
+  private cursorY = 16 + CONFIG.placement.cellSize * CONFIG.placement.cursorStartRow
+  private cursorEvaluation: PlacementEvaluation | null = null
+  private cardGesture?: CardGesture
+  private suppressedPointerId?: number
   private nextId = 1
 
-  private readonly handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
-    this.dragController.move(pointer)
-  }
-
-  private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => {
-    this.finishDrag(pointer)
-  }
-
-  constructor(scene: Phaser.Scene, options: TowerPlacementOptions) {
-    this.scene = scene
-    this.options = options
-    this.pads = createBuildPads(scene)
-    this.dragController = new TowerPlacementDragController(scene, this.pads, {
-      canInteract: this.options.canInteract,
-      getCurrentCoins: this.options.getCurrentCoins,
-      onStatusUpdate: this.options.onStatusUpdate,
-    })
-
-    buildCards(scene, (type, pointer) => this.startDrag(type, pointer))
-    for (const pad of this.pads) {
-      pad.ring
-        .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => {
-          if (this.pendingTowerType) this.placeOnPad(pad.id)
-        })
-    }
+  constructor(private readonly scene: Phaser.Scene, private readonly options: TowerPlacementOptions) {
+    this.preview = new TerrainPlacementPreview(scene)
+    this.shopCards = buildCards(scene, (type, pointer) => this.startCardGesture(type, pointer))
     scene.input.on('pointermove', this.handlePointerMove)
     scene.input.on('pointerup', this.handlePointerUp)
     scene.input.on('pointerupoutside', this.handlePointerUp)
@@ -109,143 +90,102 @@ export default class TowerPlacementSystem {
     return {
       selectedTower: selected ? this.createSelectedTowerSnapshot(selected, currentCoins) : null,
       pendingTowerType: this.pendingTowerType ?? null,
+      cursor: this.cursorEvaluation,
+      anchors: this.getAnchors(),
+      towerCount: this.towers.length,
+      towerMaximum: CONFIG.placement.maxTowers,
+      spacingLabels: {
+        arrow: '1 empty square',
+        frost: '1 empty square',
+        bomb: '2 empty squares',
+      },
       shop: SHOP_TOWER_ORDER.map((type) => {
         const tower = TOWERS[type]
-        return {
-          type,
-          name: tower.name,
-          role: tower.description,
-          cost: tower.cost,
-          affordable: currentCoins >= tower.cost,
-          shortfall: Math.max(0, tower.cost - currentCoins),
-        }
+        return { type, name: tower.name, role: tower.description, cost: tower.cost, affordable: currentCoins >= tower.cost, shortfall: Math.max(0, tower.cost - currentCoins) }
       }),
-      pads: this.pads.map((pad) => ({ id: pad.id, occupied: Boolean(pad.occupiedBy) })),
       towerIds: this.towers.map((tower) => tower.id),
-    }
-  }
-
-  destroy(): void {
-    this.scene.input.off('pointermove', this.handlePointerMove)
-    this.scene.input.off('pointerup', this.handlePointerUp)
-    this.scene.input.off('pointerupoutside', this.handlePointerUp)
-    this.scene.input.off('gameout', this.handleGameOut)
-    this.dragController.destroy()
-    for (const tower of this.towers) tower.view.destroy()
-    this.towers.length = 0
-  }
-
-  private startDrag(type: TowerType, pointer: Phaser.Input.Pointer): void {
-    if (!this.options.canInteract()) return
-    this.beginPlacement(type)
-    playClickSfx()
-    this.dragController.startDrag(type, pointer)
-  }
-
-  private finishDrag(pointer: Phaser.Input.Pointer): void {
-    const result = this.dragController.finish(pointer)
-    if (!result) {
-      if (!this.options.canInteract() && this.dragController.isDragging()) {
-        this.dragController.clear()
-        this.options.onStatusUpdate('Drag cancelled.')
-      }
-      return
-    }
-
-    const { outcome, towerType } = result
-    const definition = TOWERS[towerType]
-
-    if (outcome.type === 'success') {
-      const pad = this.resolvePadFromState(outcome)
-      if (!pad) {
-        this.options.onStatusUpdate('Drag cancelled — drop on a glowing circle.')
-        return
-      }
-
-      if (this.options.spendCoins(definition.cost)) {
-        this.placeTower(definition, pad)
-        this.pendingTowerType = undefined
-        this.options.onStatusUpdate(outcome.status)
-      } else {
-        this.options.onStatusUpdate(`Could not spend ${definition.cost} ryo now.`)
-      }
-      return
-    }
-
-    this.options.onStatusUpdate(outcome.status)
-  }
-
-  private placeTower(definition: typeof TOWERS[keyof typeof TOWERS], pad: BuildPad): void {
-    const view = new TowerView(this.scene, definition, pad.x, pad.y)
-    const tower: TowerRuntime = {
-      ...definition,
-      id: `tower-${this.nextId++}`,
-      x: pad.x,
-      y: pad.y,
-      level: 1,
-      investedCost: definition.cost,
-      maxLevel: definition.maxLevel,
-      upgradeCost: definition.upgradeCost,
-      nextShotAt: 0,
-      view,
-    }
-
-    view.setRange(tower.range)
-    pad.occupiedBy = tower.id
-    pad.marker.setText('×').setAlpha(0.55)
-    this.towers.push(tower)
-    this.selectTower(tower.id)
-    view.container.setInteractive(new Phaser.Geom.Rectangle(-22, -26, 44, 52), Phaser.Geom.Rectangle.Contains)
-    view.container.on('pointerdown', () => this.selectTower(tower.id))
-    playBuildSfx()
-
-    if (this.options.onTowerPlaced) {
-      this.options.onTowerPlaced(definition.type)
     }
   }
 
   beginPlacement(type: TowerType): boolean {
     if (!this.options.canInteract()) return false
-    const definition = TOWERS[type]
     this.pendingTowerType = type
     this.options.onTowerChosen?.(type)
+    const definition = TOWERS[type]
     this.options.onStatusUpdate(
       this.options.getCurrentCoins() >= definition.cost
-        ? `${definition.name} ready — tap a free seal.`
+        ? `${definition.name} ready — choose a clear grass square (${this.spacingLabel(type)}).`
         : `${definition.name}: need ${definition.cost - this.options.getCurrentCoins()} more ryo.`,
     )
+    this.previewPlacementAt(this.cursorX, this.cursorY)
     return true
   }
 
   cancelPlacement(): boolean {
-    const hadPendingPlacement = Boolean(this.pendingTowerType || this.dragController.isDragging())
+    const hadPending = Boolean(this.pendingTowerType || this.cardGesture)
     this.pendingTowerType = undefined
-    this.dragController.clear()
-    if (hadPendingPlacement) this.options.onStatusUpdate('Placement cancelled.')
-    return hadPendingPlacement
+    this.cardGesture = undefined
+    this.cursorEvaluation = null
+    this.preview.hide()
+    if (hadPending) this.options.onStatusUpdate('Placement cancelled.')
+    return hadPending
   }
 
-  placeOnPad(padId: string): boolean {
-    if (!this.options.canInteract() || !this.pendingTowerType) return false
-    const pad = this.pads.find((candidate) => candidate.id === padId)
+  previewPlacementAt(x: number, y: number): PlacementEvaluation | null {
+    if (!this.pendingTowerType) return null
     const definition = TOWERS[this.pendingTowerType]
-    if (!pad) {
-      this.options.onStatusUpdate('That build seal is unavailable.')
+    const evaluation = evaluateTerrainPlacement({
+      x,
+      y,
+      towerType: definition.type,
+      towerCost: definition.cost,
+      coins: this.options.getCurrentCoins(),
+      maxTowers: CONFIG.placement.maxTowers,
+      placed: this.getAnchors(),
+      onboardingVisible: this.options.getOnboardingVisible(),
+    })
+    this.cursorX = evaluation.cell.x
+    this.cursorY = evaluation.cell.y
+    this.cursorEvaluation = evaluation
+    this.preview.show(definition.type, evaluation)
+    return evaluation
+  }
+
+  placePendingAt(x: number, y: number): boolean {
+    if (!this.options.canInteract() || !this.pendingTowerType) return false
+    const type = this.pendingTowerType
+    const evaluation = this.previewPlacementAt(x, y)
+    if (!evaluation?.valid) {
+      if (evaluation) this.options.onStatusUpdate(evaluation.message)
       return false
     }
-    if (pad.occupiedBy) {
-      this.options.onStatusUpdate('That seal is occupied — choose a free circle.')
-      return false
-    }
+    const definition = TOWERS[type]
     if (!this.options.spendCoins(definition.cost)) {
-      this.options.onStatusUpdate(`Need ${definition.cost - this.options.getCurrentCoins()} more ryo.`)
+      this.previewPlacementAt(x, y)
+      this.options.onStatusUpdate(`Need ${Math.max(0, definition.cost - this.options.getCurrentCoins())} more ryo.`)
       return false
     }
-    this.placeTower(definition, pad)
+    this.placeTower(definition, evaluation.cell.x, evaluation.cell.y)
     this.pendingTowerType = undefined
-    this.dragController.clear()
-    this.options.onStatusUpdate(`${definition.name} placed.`)
+    this.cursorEvaluation = null
+    this.preview.hide()
+    this.options.onStatusUpdate(`${definition.name} placed on grass.`)
     return true
+  }
+
+  movePlacementCursor(dx: number, dy: number): PlacementEvaluation | null {
+    return this.previewPlacementAt(
+      Phaser.Math.Clamp(this.cursorX + dx * CONFIG.placement.cellSize, 0, CONFIG.screen.width),
+      Phaser.Math.Clamp(this.cursorY + dy * CONFIG.placement.cellSize, 0, CONFIG.screen.height),
+    )
+  }
+
+  confirmPlacementAtCursor(): boolean {
+    return this.placePendingAt(this.cursorX, this.cursorY)
+  }
+
+  focusShopCard(index: number): void {
+    this.shopCards.forEach((card, cardIndex) => card.setKeyboardFocus(cardIndex === index))
   }
 
   selectTower(id: string): boolean {
@@ -253,140 +193,135 @@ export default class TowerPlacementSystem {
     const tower = this.towers.find((candidate) => candidate.id === id)
     if (!tower) return false
     this.selectedTowerId = id
-    for (const candidate of this.towers) candidate.view.setSelected(candidate.id === id)
+    this.towers.forEach((candidate) => candidate.view.setSelected(candidate.id === id))
     this.options.onTowerSelected?.(id)
     return true
   }
 
-  focusPad(padId: string): boolean {
-    if (!this.options.canInteract() || !this.pendingTowerType) return false
-    let found = false
-    for (const pad of this.pads) {
-      const focused = pad.id === padId
-      found ||= focused
-      pad.marker.setText(pad.occupiedBy ? '×' : focused ? '◎' : '＋')
-      pad.ring.setStrokeStyle(focused ? 3 : 2, focused ? 0xffffff : 0xf6d365, focused ? 0.9 : 0.42)
-    }
-    return found
-  }
-
   upgradeSelectedTower(): boolean {
-    if (!this.options.canInteract()) {
-      this.options.onStatusUpdate('Cannot upgrade right now.')
-      return false
-    }
-
+    if (!this.options.canInteract()) return this.reject('Cannot upgrade right now.')
     const tower = this.towers.find((item) => item.id === this.selectedTowerId)
-    const outcome = this.resolveUpgradeRequest(tower ?? null, this.options.getCurrentCoins())
-
-    switch (outcome.type) {
-      case 'no-selection':
-        this.options.onStatusUpdate('Select a defense first to upgrade it.')
-        return false
-      case 'insufficient-funds':
-        this.options.onStatusUpdate(`Need ${outcome.needed} ryo to upgrade.`)
-        return false
-      case 'max-level':
-        this.options.onStatusUpdate('This defense is already at MAX LEVEL.')
-        return false
-      case 'success':
-        break
-    }
-
-    if (!this.options.spendCoins(outcome.cost)) {
-      this.options.onStatusUpdate('Could not upgrade now. Try again.')
-      return false
-    }
-
-    Object.assign(tower as TowerUpgradeStats, outcome.next)
-    tower!.investedCost = Math.max(0, tower!.investedCost + outcome.cost)
+    const outcome = resolveTowerUpgradeRequest(tower ? this.toUpgradeStats(tower) : null, this.options.getCurrentCoins())
+    if (outcome.type === 'no-selection') return this.reject('Select a defense first to upgrade it.')
+    if (outcome.type === 'insufficient-funds') return this.reject(`Need ${outcome.needed} ryo to upgrade.`)
+    if (outcome.type === 'max-level') return this.reject('This defense is already at MAX LEVEL.')
+    if (!this.options.spendCoins(outcome.cost)) return this.reject('Could not upgrade now. Try again.')
+    Object.assign(tower!, outcome.next)
+    tower!.investedCost += outcome.cost
     tower!.view.setLevel(tower!.level)
     tower!.view.setRange(tower!.range)
     tower!.view.setSelected(true)
     this.options.onStatusUpdate(`${TOWERS[tower!.type].name} upgraded to level ${tower!.level}.`)
     playBuildSfx()
-
-    if (this.options.onTowerUpgraded) {
-      this.options.onTowerUpgraded()
-    }
-
+    this.options.onTowerUpgraded?.()
     return true
   }
 
   sellSelectedTower(): boolean {
-    if (!this.options.canInteract()) {
-      this.options.onStatusUpdate('Cannot sell now.')
-      return false
-    }
-
-    const selected = this.towers.find((item) => item.id === this.selectedTowerId)
-    if (!selected) {
-      this.options.onStatusUpdate('Select a defense first to sell it.')
-      return false
-    }
-
-    const pad = this.findPadByTowerId(selected.id)
-    if (pad) pad.occupiedBy = undefined
-    if (pad) pad.marker.setText('＋').setAlpha(0.75)
-
-    const refund = refundForTower(selected, CONFIG.run.refundRatio)
-    this.towers.splice(this.towers.indexOf(selected), 1)
-    selected.view.destroy()
+    if (!this.options.canInteract()) return this.reject('Cannot sell now.')
+    const tower = this.towers.find((item) => item.id === this.selectedTowerId)
+    if (!tower) return this.reject('Select a defense first to sell it.')
+    const refund = refundForTower(tower, CONFIG.run.refundRatio)
+    this.towers.splice(this.towers.indexOf(tower), 1)
+    tower.view.destroy()
     this.selectedTowerId = undefined
-
-    if (this.options.onTowerSold) this.options.onTowerSold(refund)
-    this.options.onStatusUpdate(`Sold ${TOWERS[selected.type].name} for ${refund} ryo.`)
+    this.options.onTowerSold?.(refund)
+    this.options.onStatusUpdate(`Sold ${TOWERS[tower.type].name} for ${refund} ryo. Grass square freed.`)
     return true
   }
 
-  private resolvePadFromState(outcome: PlacementDropOutcome): BuildPad | undefined {
-    if (outcome.type !== 'success') return undefined
-    const selected = outcome.target
-    return this.pads.find((pad) => pad.x === selected.x && pad.y === selected.y)
+  destroy(): void {
+    this.scene.input.off('pointermove', this.handlePointerMove)
+    this.scene.input.off('pointerup', this.handlePointerUp)
+    this.scene.input.off('pointerupoutside', this.handlePointerUp)
+    this.scene.input.off('gameout', this.handleGameOut)
+    this.preview.destroy()
+    this.towers.forEach((tower) => tower.view.destroy())
+    this.towers.length = 0
   }
 
-  private resolveUpgradeRequest(tower: TowerRuntime | null, currentCoins: number): TowerUpgradeRequestOutcome {
-    if (!tower) return resolveTowerUpgradeRequest(null, currentCoins)
+  private placeTower(definition: TowerDefinition, x: number, y: number): void {
+    const view = new TowerView(this.scene, definition, x, y)
+    const tower: TowerRuntime = { ...definition, id: `tower-${this.nextId++}`, x, y, level: 1, investedCost: definition.cost, nextShotAt: 0, view }
+    view.setRange(tower.range)
+    this.towers.push(tower)
+    this.selectTower(tower.id)
+    view.container.setInteractive(new Phaser.Geom.Rectangle(-22, -26, 44, 52), Phaser.Geom.Rectangle.Contains)
+    view.container.on('pointerdown', (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation()
+      this.suppressedPointerId = pointer.id
+      this.selectTower(tower.id)
+    })
+    playBuildSfx()
+    this.options.onTowerPlaced?.(definition.type, x, y)
+  }
 
-    const selected: TowerUpgradeStats = {
-      level: tower.level,
-      damage: tower.damage,
-      range: tower.range,
-      fireRateMs: tower.fireRateMs,
-      upgradeCost: tower.upgradeCost,
-      maxLevel: tower.maxLevel,
+  private readonly handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
+    if (this.cardGesture?.pointerId === pointer.id) {
+      const distance = Phaser.Math.Distance.Between(this.cardGesture.startX, this.cardGesture.startY, pointer.worldX, pointer.worldY)
+      if (distance > CONFIG.placement.dragThresholdPx) this.cardGesture.dragging = true
+      if (!this.cardGesture.dragging) return
     }
-
-    return resolveTowerUpgradeRequest(selected, currentCoins)
+    if (this.pendingTowerType) this.previewPlacementAt(pointer.worldX, pointer.worldY)
   }
 
-  private findPadByTowerId(towerId: string): BuildPad | undefined {
-    return this.pads.find((pad) => pad.occupiedBy === towerId)
-  }
-
-  private createSelectedTowerSnapshot(selected: TowerRuntime, currentCoins: number): TowerPlacementSelectedTower {
-    const preview = createTowerUpgradePreview(selected)
-    const upgradeRequest = this.resolveUpgradeRequest(selected, currentCoins)
-    return {
-      id: selected.id,
-      name: TOWERS[selected.type].name,
-      type: selected.type,
-      level: selected.level,
-      damage: selected.damage,
-      range: selected.range,
-      fireRateMs: selected.fireRateMs,
-      upgradeCost: selected.upgradeCost,
-      affordable: upgradeRequest.type === 'success',
-      maxed: preview.maxed ?? false,
-      sellEnabled: this.options.canInteract(),
-      sellRefund: refundForTower(selected, CONFIG.run.refundRatio),
-      upgrade: { ...preview, cost: preview.cost },
+  private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => {
+    if (this.suppressedPointerId === pointer.id) {
+      this.suppressedPointerId = undefined
+      return
     }
+    if (this.cardGesture?.pointerId === pointer.id) {
+      const shouldPlace = this.cardGesture.dragging
+      this.cardGesture = undefined
+      if (shouldPlace) this.placePendingAt(pointer.worldX, pointer.worldY)
+      return
+    }
+    if (this.pendingTowerType) this.placePendingAt(pointer.worldX, pointer.worldY)
   }
 
   private readonly handleGameOut = (): void => {
-    if (!this.dragController.isDragging()) return
-    this.dragController.clear()
-    this.options.onStatusUpdate('Drag cancelled — pointer left the game.')
+    if (!this.cardGesture?.dragging) return
+    this.preview.hide()
+  }
+
+  private startCardGesture(type: TowerType, pointer: Phaser.Input.Pointer): void {
+    if (!this.beginPlacement(type)) return
+    playClickSfx()
+    this.cardGesture = { type, pointerId: pointer.id, startX: pointer.worldX, startY: pointer.worldY, dragging: false }
+  }
+
+  private getAnchors(): PlacedTowerAnchor[] {
+    return this.towers.map((tower) => ({
+      id: tower.id,
+      type: tower.type,
+      x: tower.x,
+      y: tower.y,
+      column: Math.round((tower.x - 16) / CONFIG.placement.cellSize),
+      row: Math.round((tower.y - 16) / CONFIG.placement.cellSize),
+    }))
+  }
+
+  private createSelectedTowerSnapshot(tower: TowerRuntime, coins: number): TowerPlacementSelectedTower {
+    const upgrade = createTowerUpgradePreview(this.toUpgradeStats(tower))
+    const maxed = tower.level >= tower.maxLevel
+    return {
+      id: tower.id, name: TOWERS[tower.type].name, type: tower.type, level: tower.level,
+      damage: tower.damage, range: tower.range, fireRateMs: tower.fireRateMs,
+      upgradeCost: tower.upgradeCost, affordable: !maxed && coins >= tower.upgradeCost,
+      upgrade, maxed, sellRefund: refundForTower(tower, CONFIG.run.refundRatio), sellEnabled: true,
+    }
+  }
+
+  private toUpgradeStats(tower: TowerRuntime): TowerUpgradeStats {
+    return { level: tower.level, damage: tower.damage, range: tower.range, fireRateMs: tower.fireRateMs, upgradeCost: tower.upgradeCost, maxLevel: tower.maxLevel }
+  }
+
+  private spacingLabel(type: TowerType): string {
+    return type === 'bomb' ? 'keep 2 empty squares' : 'keep 1 empty square'
+  }
+
+  private reject(message: string): false {
+    this.options.onStatusUpdate(message)
+    return false
   }
 }

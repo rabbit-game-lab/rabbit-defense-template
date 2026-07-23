@@ -46,12 +46,6 @@ export class PauseMenuController {
 
     this.pauseButton.setEnabled(true)
     this.pauseButton.setKeyboardFocus(false)
-    this.scene.input.keyboard?.on('keydown-ESC', this.onPauseToggle)
-    this.scene.input.keyboard?.on('keydown-P', this.onPauseToggle)
-    this.scene.input.keyboard?.on('keydown-M', this.onMuteToggle)
-    this.scene.input.keyboard?.on('keydown-TAB', this.onNavigate)
-    this.scene.input.keyboard?.on('keydown-UP', this.onNavigate)
-    this.scene.input.keyboard?.on('keydown-DOWN', this.onNavigate)
     this.scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy)
     this.setMarker(null)
   }
@@ -72,18 +66,29 @@ export class PauseMenuController {
     return this.state !== 'running'
   }
 
+  public handleKeyboardEvent(event: KeyboardEvent): boolean {
+    if (event.key.toLowerCase() === 'm') {
+      this.onMuteToggle()
+      return true
+    }
+    if (this.audioPanel) return false
+    if (event.key === 'Escape' || event.key.toLowerCase() === 'p') {
+      this.onPauseToggle()
+      return true
+    }
+    if (this.state !== 'running' && (event.key === 'Tab' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      this.onNavigate(event)
+      return true
+    }
+    return false
+  }
+
   public destroy = (): void => {
     if (this.isDestroyed) return
     if (this.state !== 'running' && !this.isTransitioning) {
       this.getGameScene()?.scene.resume()
     }
     this.isDestroyed = true
-    this.scene.input.keyboard?.off('keydown-ESC', this.onPauseToggle)
-    this.scene.input.keyboard?.off('keydown-P', this.onPauseToggle)
-    this.scene.input.keyboard?.off('keydown-M', this.onMuteToggle)
-    this.scene.input.keyboard?.off('keydown-TAB', this.onNavigate)
-    this.scene.input.keyboard?.off('keydown-UP', this.onNavigate)
-    this.scene.input.keyboard?.off('keydown-DOWN', this.onNavigate)
     this.destroyOverlay()
     this.pauseButton.destroy()
     this.setMarker(null)

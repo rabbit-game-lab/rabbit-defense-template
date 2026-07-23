@@ -64,7 +64,7 @@ export function resolveHudStatus(
 export function getRunFallbackStatus(hasPlacedTower: boolean): string {
   return hasPlacedTower
     ? 'Defend Hidden Dojo — build or upgrade between raids.'
-    : 'Drag a defense from the shop to a glowing seal.'
+    : 'Choose a defense, then place it on a clear grass square.'
 }
 
 function isValidMessage(nowMs: number, message: TimedHudMessage | undefined): message is TimedHudMessage {

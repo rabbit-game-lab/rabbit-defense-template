@@ -1,16 +1,7 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
 import { TOWER_TEXTURE_KEYS } from '../data/assets'
-import { BUILD_SPOTS, type TowerType, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
-
-export interface BuildPad {
-  id: string
-  x: number
-  y: number
-  occupiedBy?: string
-  ring: Phaser.GameObjects.Arc
-  marker: Phaser.GameObjects.Text
-}
+import { type TowerType, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
 
 export interface ShopCard {
   type: TowerType
@@ -18,6 +9,7 @@ export interface ShopCard {
   y: number
   width: number
   height: number
+  setKeyboardFocus(focused: boolean): void
 }
 
 export function createBattleBackground(scene: Phaser.Scene): void {
@@ -39,19 +31,6 @@ export function drawPath(scene: Phaser.Scene): void {
     backgroundColor: '#111827',
     padding: { x: 5, y: 2 },
   }).setOrigin(0.5).setDepth(2)
-}
-
-export function createBuildPads(scene: Phaser.Scene): BuildPad[] {
-  return BUILD_SPOTS.map((spot, index) => {
-    const ring = scene.add.circle(spot.x, spot.y, CONFIG.run.buildSpotRadius, 0xf6d365, 0.08)
-    ring.setStrokeStyle(2, 0xf6d365, 0.42)
-    const marker = scene.add.text(spot.x, spot.y, '＋', {
-      fontSize: '20px',
-      color: '#fff4cf',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setAlpha(0.75)
-    return { id: `seal-${index + 1}`, ...spot, ring, marker }
-  })
 }
 
 export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, pointer: Phaser.Input.Pointer) => void): ShopCard[] {
@@ -110,6 +89,11 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
     card.setInteractive(new Phaser.Geom.Rectangle(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains)
     card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
 
-    return { type, x: centerX, y: centerY, width: cardWidth, height: cardHeight }
+    return {
+      type, x: centerX, y: centerY, width: cardWidth, height: cardHeight,
+      setKeyboardFocus: (focused: boolean) => {
+        cardBg.setStrokeStyle(focused ? 3 : 1, focused ? 0xffffff : tower.topColor, focused ? 1 : 0.8)
+      },
+    }
   })
 }

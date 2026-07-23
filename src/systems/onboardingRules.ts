@@ -24,7 +24,7 @@ export interface OnboardingTransition {
 const ONBOARDING_INSTRUCTIONS: Record<OnboardingStep, string> = {
   objective: 'Objective: protect the Hidden Dojo through all 10 raids.',
   choose: '1 · Choose a defense card. Each card shows its combat role and cost.',
-  place: '2 · Tap a free ＋ seal to place it. Dragging is a shortcut.',
+  place: '2 · Tap a clear grass square. Leave 1 empty square (2 for Fire Mortar). Dragging is a shortcut.',
   inspect: '3 · Tap the placed defense to inspect its range and upgrades.',
   complete: '',
 } as const

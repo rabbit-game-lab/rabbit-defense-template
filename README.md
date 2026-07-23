@@ -4,7 +4,7 @@ A pixel-art ninja tower-defense template for Rabbit Game Lab, built from the Rab
 
 ## Game loop
 
-- Drag ninja defenses from the shop onto glowing build seals.
+- Choose ninja defenses and place them on clear grass squares.
 - Stop rival clans from reaching Hidden Dojo.
 - Earn ryo from defeated raiders.
 - Select a placed defense to upgrade or sell it.

@@ -20,7 +20,7 @@ import {
   type RunResultTracker,
 } from '../systems/runResultRules'
 import { createBattleBackground, createHeader, drawPath } from '../systems/gameBoard'
-import { playFanfareSfx } from '../systems/audioManager'
+import { playFanfareSfx, playRunDefeatSfx } from '../systems/audioManager'
 import { createEmptyProfile, applyRunResultToProfile, type ProfileRecord } from '../systems/profilePersistenceRules'
 import { loadProfile, markOnboardingComplete, updateProfile } from '../systems/profileStore'
 import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
@@ -34,7 +34,8 @@ import {
   type HudFeedback,
 } from '../systems/hudRules'
 import type { WaveProgressSnapshot } from '../systems/waves'
-import type { TowerType } from '../data/towerDefense'
+import { TOWERS, type TowerType } from '../data/towerDefense'
+import type { PlacementEvaluation } from '../data/terrain'
 import { announceHpLoss, announcePlacement, announceRaid, announceResult } from '../accessibility/liveAnnouncements'
 
 export interface HudState {
@@ -129,6 +130,7 @@ export default class GameScene extends Phaser.Scene {
     this.placement = new TowerPlacementSystem(this, {
       canInteract: () => isRunActive(this.runState) && !this.uiBlocked,
       getCurrentCoins: () => this.coins,
+      getOnboardingVisible: () => this.onboardingState.step !== 'complete',
       spendCoins: (amount: number): boolean => {
         if (this.coins < amount) return false
         this.coins -= amount
@@ -139,7 +141,8 @@ export default class GameScene extends Phaser.Scene {
         if (status.trim()) announcePlacement(status)
       },
       onTowerChosen: () => this.handleOnboardingEvent('tower-chosen'),
-      onTowerPlaced: () => {
+      onTowerPlaced: (type, x, y) => {
+        this.combat.effects.showPlacement(x, y, TOWERS[type].topColor)
         this.handleOnboardingEvent('tower-placed')
         if (!this.hasPlacedFirstTower) {
           this.hasPlacedFirstTower = true
@@ -239,16 +242,28 @@ export default class GameScene extends Phaser.Scene {
     return this.placement.cancelPlacement()
   }
 
-  placeOnPad(padId: string): boolean {
-    return this.placement.placeOnPad(padId)
+  previewPlacementAt(x: number, y: number): PlacementEvaluation | null {
+    return this.placement.previewPlacementAt(x, y)
+  }
+
+  placePendingAt(x: number, y: number): boolean {
+    return this.placement.placePendingAt(x, y)
+  }
+
+  movePlacementCursor(dx: number, dy: number): PlacementEvaluation | null {
+    return this.placement.movePlacementCursor(dx, dy)
+  }
+
+  confirmPlacementAtCursor(): boolean {
+    return this.placement.confirmPlacementAtCursor()
+  }
+
+  focusShopCard(index: number): void {
+    this.placement.focusShopCard(index)
   }
 
   selectTower(towerId: string): boolean {
     return this.placement.selectTower(towerId)
-  }
-
-  focusPad(padId: string): boolean {
-    return this.placement.focusPad(padId)
   }
 
   skipOnboarding(): void {
@@ -298,6 +313,7 @@ export default class GameScene extends Phaser.Scene {
       this.coins,
     )
 
+    this.combat.effects.showResult(didWin ? 'victory' : 'defeat')
     this.persistRunResult()
 
     this.placement.destroy()
@@ -307,6 +323,8 @@ export default class GameScene extends Phaser.Scene {
     if (didWin && !this.hasPlayedFanfare) {
       playFanfareSfx()
       this.hasPlayedFanfare = true
+    } else if (!didWin) {
+      playRunDefeatSfx()
     }
   }
 

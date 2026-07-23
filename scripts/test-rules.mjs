@@ -116,6 +116,32 @@ import {
   resolveMenuStartAction,
   isRestartSceneConfigured,
 } from '../.tmp-tests/src/scenes/flowContracts.js'
+import {
+  cellOverlapsCircle,
+  cellOverlapsRectangle,
+  chebyshevCellDistance,
+  evaluateTerrainPlacement,
+  parseTerrainCellId,
+  placementReasonMessage,
+  pointOverlapsPath,
+  snapToTerrainCell,
+  terrainCellId,
+} from '../.tmp-tests/src/systems/terrainPlacementRules.js'
+import {
+  createTerrainFocusTarget,
+  cycleFocusInRegion,
+  cycleFocusTarget,
+  moveTerrainFocus,
+  reconcileFocusTarget,
+} from '../.tmp-tests/src/systems/focusNavigationRules.js'
+import {
+  MAX_ACTIVE_PROJECTILE_TRAILS,
+  PROJECTILE_TRAIL_SAMPLE_MS,
+  clampPlacementSparkCount,
+  isEffectAllowed,
+  shouldSampleProjectileTrail,
+} from '../.tmp-tests/src/systems/effectPolicyRules.js'
+import { TERRAIN_BLOCKERS } from '../.tmp-tests/src/data/terrain.js'
 
 import {
   resolvePauseMenuAction,
@@ -316,9 +342,9 @@ assert.match(pauseMenuControllerSource, /gameScene\?\.scene\.resume\(\)/)
 assert.match(pauseMenuControllerSource, /manager\.start\(GAME_SCENE_KEY\)/)
 assert.match(menuSceneSource, /manager\.stop\(GAME_SCENE_KEY\)/)
 assert.match(pauseMenuControllerSource, /scene\.scene\.start\(MAIN_MENU_SCENE_KEY\)/)
-assert.match(pauseMenuControllerSource, /keydown-ESC/)
-assert.match(pauseMenuControllerSource, /keydown-P/)
-assert.match(pauseMenuControllerSource, /keydown-M/)
+assert.match(pauseMenuControllerSource, /handleKeyboardEvent\(event: KeyboardEvent\)/)
+assert.doesNotMatch(pauseMenuControllerSource, /keyboard\?\.on\('keydown/)
+assert.match(uiSceneSource, /pauseMenuController\.handleKeyboardEvent\(event\)/)
 assert.match(pauseMenuControllerSource, /setKeyboardFocus/)
 assert.match(pauseMenuControllerSource, /new AudioSettingsPanel/)
 assert.match(pauseMenuControllerSource, /baseDepth:/)
@@ -421,7 +447,7 @@ assert.equal(canAffordTower(50, { cost: 75 }), false)
 assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
-assert.equal(getRunFallbackStatus(false), 'Drag a defense from the shop to a glowing seal.')
+assert.equal(getRunFallbackStatus(false), 'Choose a defense, then place it on a clear grass square.')
 assert.equal(getRunFallbackStatus(true), 'Defend Hidden Dojo — build or upgrade between raids.')
 assert.deepEqual(
   findNearestPadWithinRadius(
@@ -745,7 +771,7 @@ let onboardingState = createOnboardingState(0, onboardingConfig, false)
 assert.equal(onboardingState.step, 'objective')
 assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: protect the Hidden Dojo through all 10 raids.')
 assert.match(getOnboardingInstruction('choose'), /Choose a defense card/)
-assert.match(getOnboardingInstruction('place'), /Tap a free/)
+assert.match(getOnboardingInstruction('place'), /Tap a clear grass square/)
 assert.match(getOnboardingInstruction('inspect'), /inspect its range/)
 
 onboardingState = applyObjectiveAutoAdvance(onboardingState, 1200).state
@@ -1265,4 +1291,213 @@ assert.deepEqual(resolveOrientationGate(gateFromPaused.state, true, 'running'), 
 assert.equal(refundForTowerEconomy({ cost: 40, level: 1, upgradeCost: 25, investedCost: 150 }, 0.6), 90)
 assert.equal(refundForTowerEconomy({ cost: 40, level: 2, upgradeCost: 25 }, 0.5), 32)
 
-console.log('audio settings + towerDefenseRules, waveRules, runResultRules, profilePersistenceRules, towerEconomyRules, onboardingRules, hudRules, and runState tests passed')
+// terrainPlacementRules
+assert.deepEqual(
+  snapToTerrainCell(0, 0),
+  { column: 0, row: 0, x: 16, y: 16 },
+  'the first terrain square is centered at 16,16',
+)
+assert.deepEqual(
+  snapToTerrainCell(799.99, 479.99),
+  { column: 24, row: 14, x: 784, y: 464 },
+  'the final in-bounds point snaps to the final 32px square',
+)
+assert.deepEqual(snapToTerrainCell(47.99, 47.99), { column: 1, row: 1, x: 48, y: 48 })
+assert.deepEqual(snapToTerrainCell(48, 48), { column: 1, row: 1, x: 48, y: 48 })
+const encodedTerrainCell = terrainCellId(snapToTerrainCell(208, 272))
+assert.equal(encodedTerrainCell, 'terrain:6:8')
+assert.deepEqual(parseTerrainCellId(encodedTerrainCell), {
+  column: 6,
+  row: 8,
+  x: 208,
+  y: 272,
+})
+assert.equal(parseTerrainCellId('terrain:25:0'), null)
+assert.equal(parseTerrainCellId('shop:arrow'), null)
+
+const terrainRequest = {
+  x: 208,
+  y: 272,
+  towerType: 'arrow',
+  towerCost: 50,
+  coins: 100,
+  maxTowers: 6,
+  placed: [],
+  onboardingVisible: false,
+}
+const clearGrass = evaluateTerrainPlacement(terrainRequest)
+assert.equal(clearGrass.valid, true)
+assert.equal(clearGrass.reason, null)
+assert.equal(clearGrass.requiredSpacingCells, 2)
+assert.equal(clearGrass.shortfall, 0)
+for (const [x, y] of [[-0.01, 100], [800, 100], [100, -1], [100, 480], [Number.NaN, 50]]) {
+  assert.equal(
+    evaluateTerrainPlacement({ ...terrainRequest, x, y }).reason,
+    'bounds',
+    `out-of-world point ${x},${y} is rejected before snapped-cell blockers`,
+  )
+}
+assert.equal(evaluateTerrainPlacement({ ...terrainRequest, x: 400, y: 16 }).reason, 'reserved-ui')
+assert.equal(evaluateTerrainPlacement({ ...terrainRequest, x: 80, y: 208 }).reason, 'path')
+assert.equal(evaluateTerrainPlacement({ ...terrainRequest, x: 48, y: 368 }).reason, 'scenery')
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 400, y: 160, onboardingVisible: true }).reason,
+  'reserved-ui',
+  'the onboarding panel blocks its covered grass while visible',
+)
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 400, y: 160, onboardingVisible: false }).valid,
+  true,
+  'the dynamic onboarding blocker disappears with its panel',
+)
+
+for (const blocker of TERRAIN_BLOCKERS) {
+  const cell =
+    blocker.kind === 'rectangle'
+      ? {
+          column: 0,
+          row: 0,
+          x: (blocker.left + blocker.right) / 2,
+          y: (blocker.top + blocker.bottom) / 2,
+        }
+      : { column: 0, row: 0, x: blocker.x, y: blocker.y }
+  assert.equal(
+    blocker.kind === 'rectangle'
+      ? cellOverlapsRectangle(cell, blocker)
+      : cellOverlapsCircle(cell, blocker),
+    true,
+    `${blocker.id} intersects a square covering its center`,
+  )
+}
+assert.equal(
+  cellOverlapsRectangle(
+    { column: 0, row: 0, x: 84, y: 50 },
+    { kind: 'rectangle', id: 'tangent', reason: 'scenery', left: 100, top: 0, right: 120, bottom: 100 },
+  ),
+  false,
+  'exact rectangle tangency remains buildable',
+)
+assert.equal(
+  cellOverlapsCircle(
+    { column: 0, row: 0, x: 50, y: 50 },
+    { x: 76, y: 50, radius: 10 },
+  ),
+  false,
+  'exact circle tangency remains buildable',
+)
+const straightPath = [{ x: 0, y: 0 }, { x: 100, y: 0 }]
+assert.equal(pointOverlapsPath({ x: 50, y: 37.999 }, straightPath, 38), true)
+assert.equal(pointOverlapsPath({ x: 50, y: 38 }, straightPath, 38), false)
+assert.equal(pointOverlapsPath({ x: 138, y: 0 }, straightPath, 38), false, 'endpoint tangency is valid')
+
+const anchor = { id: 'existing', type: 'arrow', column: 6, row: 8, x: 208, y: 272 }
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, placed: [anchor] }).reason,
+  'occupied',
+  'occupied takes precedence over spacing, cap, and funds',
+)
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 240, y: 272, placed: [anchor] }).reason,
+  'spacing',
+  'arrow towers reject an adjacent square',
+)
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 240, y: 240, placed: [anchor] }).reason,
+  'spacing',
+  'diagonals count toward Chebyshev spacing',
+)
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 272, y: 272, placed: [anchor] }).valid,
+  true,
+  'arrow towers accept a center delta of two cells',
+)
+const bombAnchor = { ...anchor, id: 'bomb', type: 'bomb' }
+assert.equal(
+  evaluateTerrainPlacement({ ...terrainRequest, x: 272, y: 272, placed: [bombAnchor] }).reason,
+  'spacing',
+  'an arrow built after a mortar uses the mortar spacing',
+)
+assert.equal(
+  evaluateTerrainPlacement({
+    ...terrainRequest,
+    x: 272,
+    y: 272,
+    towerType: 'bomb',
+    placed: [anchor],
+  }).reason,
+  'spacing',
+  'a mortar built after an arrow uses the mortar spacing',
+)
+const distantArrowAnchor = { ...anchor, column: 9, x: 304 }
+const distantBombAnchor = { ...bombAnchor, column: 9, x: 304 }
+for (const [towerType, placed] of [['arrow', [distantBombAnchor]], ['bomb', [distantArrowAnchor]]]) {
+  assert.equal(
+    evaluateTerrainPlacement({ ...terrainRequest, towerType, placed }).valid,
+    true,
+    `mixed ${towerType} placement accepts a three-cell center delta`,
+  )
+}
+assert.equal(chebyshevCellDistance(anchor, { column: 8, row: 10 }), 2)
+
+const remoteAnchors = Array.from({ length: 6 }, (_, index) => ({
+  id: `remote-${index}`,
+  type: 'arrow',
+  column: 24,
+  row: 0,
+  x: 784,
+  y: 16,
+}))
+assert.equal(
+  evaluateTerrainPlacement({
+    ...terrainRequest,
+    coins: 0,
+    placed: remoteAnchors,
+  }).reason,
+  'tower-limit',
+  'the cap has deterministic precedence over affordability',
+)
+const fundsEvaluation = evaluateTerrainPlacement({ ...terrainRequest, coins: 17 })
+assert.equal(fundsEvaluation.reason, 'insufficient-funds')
+assert.equal(fundsEvaluation.shortfall, 33)
+assert.equal(placementReasonMessage('insufficient-funds', 33), 'Need 33 more ryo to build this tower.')
+
+// focusNavigationRules
+const invalidButFocusable = createTerrainFocusTarget(snapToTerrainCell(80, 208))
+assert.deepEqual(invalidButFocusable, { id: 'terrain:2:6', region: 'terrain', enabled: true })
+assert.deepEqual(
+  moveTerrainFocus(snapToTerrainCell(16, 16), -1, -1),
+  snapToTerrainCell(16, 16),
+  'terrain keyboard movement clamps safely at the first square',
+)
+assert.deepEqual(moveTerrainFocus(snapToTerrainCell(208, 272), 1, -1), snapToTerrainCell(240, 240))
+const focusTargets = [
+  { id: 'shop:arrow', region: 'shop', enabled: true },
+  { id: 'shop:frost', region: 'shop', enabled: false },
+  invalidButFocusable,
+  { id: 'tower:one', region: 'towers', enabled: true },
+  { id: 'action:upgrade', region: 'actions', enabled: true },
+  { id: 'pause', region: 'pause', enabled: true },
+]
+assert.equal(cycleFocusTarget(focusTargets, 'shop:arrow', 1)?.id, invalidButFocusable.id)
+assert.equal(cycleFocusTarget(focusTargets, 'shop:arrow', -1)?.id, 'pause')
+assert.equal(cycleFocusInRegion(focusTargets, 'shop', 'shop:arrow', 1)?.id, 'shop:arrow')
+assert.equal(reconcileFocusTarget(focusTargets, 'tower:removed', 'towers')?.id, 'tower:one')
+assert.equal(reconcileFocusTarget(focusTargets, 'tower:one')?.id, 'tower:one')
+
+// effectPolicyRules
+for (const effect of ['particles', 'projectile-trail', 'firing-pulse', 'tween', 'flash', 'halo', 'camera-shake']) {
+  assert.equal(isEffectAllowed(effect, true), false, `${effect} is suppressed immediately`)
+  assert.equal(isEffectAllowed(effect, false), true)
+}
+for (const effect of ['static-warning', 'placement-validity', 'range-indicator', 'hp-change', 'announcement', 'result-content']) {
+  assert.equal(isEffectAllowed(effect, true), true, `${effect} survives Reduced Effects`)
+}
+assert.equal(shouldSampleProjectileTrail(50, 0, 0, false), true)
+assert.equal(shouldSampleProjectileTrail(PROJECTILE_TRAIL_SAMPLE_MS - 1, 0, 0, false), false)
+assert.equal(shouldSampleProjectileTrail(100, 0, MAX_ACTIVE_PROJECTILE_TRAILS, false), false)
+assert.equal(shouldSampleProjectileTrail(100, null, 0, true), false)
+assert.equal(clampPlacementSparkCount(10, false), 6)
+assert.equal(clampPlacementSparkCount(4.9, false), 4)
+assert.equal(clampPlacementSparkCount(4, true), 0)
+
+console.log('audio settings, terrain placement, focus, effect policy, tower defense, wave, run result, persistence, economy, onboarding, HUD, and run state rules passed')

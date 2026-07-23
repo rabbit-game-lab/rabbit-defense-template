@@ -3,6 +3,8 @@
  * AudioContext unlock and mute arrive through rabbit/sdk.
  */
 import * as sdk from '../rabbit/sdk.js'
+import type { TowerType } from '../data/towerDefense.js'
+import { CONFIG } from '../game.config.js'
 import {
   createDefaultAudioSettings,
   type AudioSettings,
@@ -24,7 +26,7 @@ function getCtx(): AudioContext {
 
 function getEffectiveVolume(toneVolume: number): number {
   if (audioSettings.muted) return 0
-  return toneVolume * audioSettings.soundVolume
+  return toneVolume * CONFIG.audio.sfxVolume * audioSettings.soundVolume
 }
 
 export function applyAudioSettings(next: Partial<AudioSettings>): AudioSettings {
@@ -102,9 +104,17 @@ export function playBuildSfx(): void {
   playTone(380, 720, 0.16, 0.24, 'square')
 }
 
-/** Tower projectile release. */
-export function playShotSfx(): void {
-  playTone(520, 360, 0.08, 0.12)
+/** Recognizable projectile release per tower type. */
+export function playShotSfx(type: TowerType = 'arrow'): void {
+  if (type === 'frost') {
+    playTone(840, 620, 0.11, 0.13, 'sine')
+    return
+  }
+  if (type === 'bomb') {
+    playTone(210, 105, 0.16, 0.17, 'square')
+    return
+  }
+  playTone(620, 390, 0.07, 0.11, 'triangle')
 }
 
 /** Monster defeat. */
@@ -117,7 +127,19 @@ export function playLeakSfx(): void {
   playTone(140, 70, 0.28, 0.28, 'sawtooth')
 }
 
-/** Win/game-over fanfare. */
+/** Final boss arrival warning. */
+export function playBossArrivalSfx(): void {
+  playTone(130, 130, 0.22, 0.24, 'sawtooth')
+  window.setTimeout(() => playTone(98, 82, 0.3, 0.22, 'square'), 170)
+}
+
+/** Whole-run defeat cue, distinct from an enemy defeat. */
+export function playRunDefeatSfx(): void {
+  playTone(260, 120, 0.32, 0.25, 'sawtooth')
+  window.setTimeout(() => playTone(150, 58, 0.42, 0.2, 'triangle'), 150)
+}
+
+/** Victory fanfare. */
 export function playFanfareSfx(): void {
   playTone(440, 660, 0.14, 0.22)
   window.setTimeout(() => playTone(660, 990, 0.18, 0.2), 90)
