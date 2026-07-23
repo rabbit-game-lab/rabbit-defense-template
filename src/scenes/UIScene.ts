@@ -1,34 +1,157 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import type GameScene from './GameScene'
+import type { HudState } from './GameScene'
+
+interface GameSceneBridge {
+  getHudState: () => HudState
+  upgradeSelectedTower: () => boolean
+}
 
 export default class UIScene extends Phaser.Scene {
+  private readonly onboardingPanel = {
+    bg: undefined as Phaser.GameObjects.Rectangle | undefined,
+    text: undefined as Phaser.GameObjects.Text | undefined,
+  }
   private statsLine!: Phaser.GameObjects.Text
   private waveLine!: Phaser.GameObjects.Text
   private selectedLine!: Phaser.GameObjects.Text
   private statusLine!: Phaser.GameObjects.Text
+  private upgradeButtonBg!: Phaser.GameObjects.Rectangle
+  private upgradeButtonText!: Phaser.GameObjects.Text
+  private upgradePreviewLine!: Phaser.GameObjects.Text
+  private upgradeEnabled = true
 
   constructor() {
     super('UIScene')
   }
 
   create(): void {
-    this.add.rectangle(205, 24, 390, 38, CONFIG.ui.panelColor, 0.9).setStrokeStyle(1, CONFIG.world.accentColor, 0.35)
-    this.statsLine = this.add.text(18, 12, '', { fontSize: '14px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
-    this.waveLine = this.add.text(258, 12, '', { fontSize: '14px', color: '#c8d8b6', fontStyle: 'bold' })
+    const hud = CONFIG.ui.hud
 
-    this.add.rectangle(402, 456, 760, 34, CONFIG.ui.panelColor, 0.86).setStrokeStyle(1, CONFIG.world.accentColor, 0.28)
-    this.selectedLine = this.add.text(28, 446, '', { fontSize: '12px', color: '#ffd56a', fontStyle: 'bold' })
-    this.statusLine = this.add.text(212, 446, '', { fontSize: '12px', color: CONFIG.ui.textColor })
+    this.add
+      .rectangle(hud.topRowX, hud.topRowY + hud.topRowHeight / 2, hud.topRowWidth, hud.topRowHeight, CONFIG.ui.panelColor, 0.9)
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.35)
+    this.statsLine = this.add.text(18, hud.topRowY + 2, '', {
+      fontSize: '14px',
+      color: CONFIG.ui.textColor,
+      fontStyle: 'bold',
+    })
+    this.waveLine = this.add.text(220, hud.topRowY + 2, '', {
+      fontSize: '12px',
+      color: CONFIG.ui.hud.infoTextColor,
+      fontStyle: 'bold',
+    })
+
+    const bottomTop = hud.bottomY - hud.bottomHeight / 2
+    this.add
+      .rectangle(CONFIG.screen.width / 2, hud.bottomY, hud.bottomWidth, hud.bottomHeight, CONFIG.ui.panelColor, 0.86)
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.28)
+
+    this.selectedLine = this.add.text(hud.selectedTextX, bottomTop + hud.selectedLineY, '', {
+      fontSize: hud.selectedFontSize,
+      color: '#ffd56a',
+      fontStyle: 'bold',
+    })
+    this.statusLine = this.add.text(hud.statusTextX, bottomTop + hud.statusLineY, '', {
+      fontSize: hud.statusFontSize,
+      color: CONFIG.ui.textColor,
+    })
+    this.upgradePreviewLine = this.add.text(hud.statusTextX, bottomTop + hud.previewLineY, '', {
+      fontSize: hud.previewFontSize,
+      color: '#ffd56a',
+    })
+
+    const onboarding = CONFIG.ui.onboarding
+    this.onboardingPanel.bg = this.add
+      .rectangle(onboarding.x, onboarding.y, onboarding.width, onboarding.height, CONFIG.ui.panelColor, 0.95)
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.35)
+    this.onboardingPanel.text = this.add
+      .text(onboarding.x, onboarding.y, '', {
+        fontSize: onboarding.textSize,
+        color: CONFIG.ui.textColor,
+        align: 'center',
+        wordWrap: { width: Math.max(260, onboarding.width - 16) },
+      })
+      .setOrigin(0.5)
+
+    this.onboardingPanel.text.setLineSpacing(1)
+
+    this.upgradeButtonBg = this.add
+      .rectangle(
+        hud.upgradeButtonX,
+        hud.upgradeButtonY,
+        hud.upgradeButtonWidth,
+        Math.max(CONFIG.ui.hud.upgradeButtonHeight, 44),
+        CONFIG.ui.panelColor,
+        0.95,
+      )
+      .setStrokeStyle(1, CONFIG.world.accentColor, 0.33)
+      .setInteractive()
+
+    this.upgradeButtonBg.on('pointerover', () => {
+      if (this.upgradeEnabled) this.input.setDefaultCursor('pointer')
+    })
+    this.upgradeButtonBg.on('pointerout', () => {
+      this.input.setDefaultCursor('default')
+    })
+
+    this.upgradeButtonText = this.add
+      .text(hud.upgradeButtonX, hud.upgradeButtonY, '', {
+        fontSize: hud.upgradeButtonFontSize,
+        color: CONFIG.ui.textColor,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 0.5)
+
+    this.upgradeButtonBg.on('pointerdown', () => {
+      const gameScene = this.scene.get('GameScene') as Phaser.Scene & GameSceneBridge
+      if (!gameScene.scene.isActive()) return
+      gameScene.upgradeSelectedTower()
+    })
   }
 
   update(): void {
-    const gameScene = this.scene.get('GameScene') as GameScene
+    const gameScene = this.scene.get('GameScene') as Phaser.Scene & GameSceneBridge
     if (!gameScene.scene.isActive()) return
-    const hud = gameScene.getHudState()
+
+    const hud: HudState = gameScene.getHudState()
     this.statsLine.setText(`Coins ${hud.coins}   Lives ${hud.lives}`)
-    this.waveLine.setText(`Wave ${hud.wave}/${hud.totalWaves}`)
-    this.selectedLine.setText(`Selected: ${hud.selectedTower}`)
+    this.waveLine.setText(hud.waveLabel)
+
+    if (!hud.selectedTower) {
+      this.selectedLine.setText('Selected: none')
+      this.upgradeButtonText.setText('Upgrade · 0c')
+      this.upgradePreviewLine.setText('No tower selected.')
+      this.setUpgradeState(false)
+    } else {
+      this.selectedLine.setText(
+        `${hud.selectedTower.name} L${hud.selectedTower.level} (DMG ${hud.selectedTower.damage}, RNG ${hud.selectedTower.range}, ATK ${hud.selectedTower.fireRateMs}ms)`,
+      )
+      this.upgradeButtonText.setText(`Upgrade · ${hud.selectedTower.upgradeCost}c`)
+      this.upgradePreviewLine.setText(hud.selectedTower.upgrade.summary)
+      this.setUpgradeState(hud.selectedTower.affordable)
+    }
+
     this.statusLine.setText(hud.status)
+    this.renderOnboarding(hud)
+  }
+
+  private renderOnboarding(hud: HudState): void {
+    if (!this.onboardingPanel.bg || !this.onboardingPanel.text) return
+    const shouldShow = hud.onboardingStep !== 'complete'
+    this.onboardingPanel.bg.setVisible(shouldShow)
+    this.onboardingPanel.text.setVisible(shouldShow)
+    if (!shouldShow) return
+
+    this.onboardingPanel.text.setText(hud.onboardingInstruction)
+  }
+
+  private setUpgradeState(enabled: boolean): void {
+    this.upgradeEnabled = enabled
+    this.upgradeButtonBg.setAlpha(enabled ? 1 : 0.45)
+    this.upgradeButtonText.setColor(enabled ? CONFIG.ui.textColor : '#8b8f84')
+    if (!enabled) {
+      this.input.setDefaultCursor('default')
+    }
   }
 }

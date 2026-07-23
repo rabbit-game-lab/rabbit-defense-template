@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import { BUILD_SPOTS, PATH, type TowerType, SHOP_CARD_HEIGHT, SHOP_CARD_START, SHOP_CARD_SPACING_X, SHOP_CARD_WIDTH, SHOP_PANEL, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
-import { distanceBetween } from './towerDefenseRules'
+import { BUILD_SPOTS, PATH, type TowerType, SHOP_TOWER_ORDER, TOWERS } from '../data/towerDefense'
 
 export interface BuildPad {
   x: number
@@ -68,42 +67,66 @@ export function createBuildPads(scene: Phaser.Scene): BuildPad[] {
 }
 
 export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, pointer: Phaser.Input.Pointer) => void): ShopCard[] {
+  const shopCfg = CONFIG.ui.shop
+  const shopBounds = {
+    left: shopCfg.panelX - shopCfg.panelWidth / 2,
+    top: shopCfg.panelY - shopCfg.panelHeight / 2,
+  }
+
   scene.add
-    .rectangle(SHOP_PANEL.x, SHOP_PANEL.y, SHOP_PANEL.width, SHOP_PANEL.height, CONFIG.ui.panelColor, 0.92)
+    .rectangle(shopCfg.panelX, shopCfg.panelY, shopCfg.panelWidth, shopCfg.panelHeight, CONFIG.ui.panelColor, 0.92)
     .setStrokeStyle(2, CONFIG.world.accentColor, 0.4)
-  scene.add.text(SHOP_CARD_START.x, SHOP_CARD_START.y, 'Drag towers', { fontSize: '13px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
+
+  scene.add.text(
+    shopBounds.left + shopCfg.cardPadding,
+    shopBounds.top + shopCfg.titleY,
+    'Drag towers',
+    {
+      fontSize: shopCfg.cardTitleFontSize,
+      color: CONFIG.ui.textColor,
+      fontStyle: 'bold',
+    },
+  )
+
+  const cardWidth = Math.max(shopCfg.cardWidth, shopCfg.minTouchablePx)
+  const cardHeight = Math.max(shopCfg.cardHeight, shopCfg.minTouchablePx)
 
   return SHOP_TOWER_ORDER.map((type, index) => {
-    const cardX = SHOP_CARD_START.x + 8 + index * SHOP_CARD_SPACING_X
-    const cardY = SHOP_CARD_START.y + 28
     const tower = TOWERS[type]
-    const card = scene.add
-      .rectangle(cardX, cardY, SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT, 0x2f422b, 0.95)
+    const towerLabel = tower.name.split(' ')[0]
+
+    const cardLeft = shopBounds.left + shopCfg.cardPadding + index * shopCfg.cardSpacingX
+    const cardTop = shopBounds.top + shopCfg.cardPadding + 18
+    const centerX = cardLeft + cardWidth / 2
+    const centerY = cardTop + cardHeight / 2
+
+    const card = scene.add.container(centerX, centerY)
+    const cardBg = scene.add.rectangle(0, 0, cardWidth, cardHeight, 0x2f422b, 0.95)
+    cardBg.setStrokeStyle(1, tower.topColor)
+
+    const iconX = -cardWidth / 2 + shopCfg.cardPadding + shopCfg.iconWidth / 2
+    const iconY = -shopCfg.cardPadding / 2
+    const icon = scene.add.rectangle(iconX, iconY, shopCfg.iconWidth, shopCfg.iconHeight, tower.color)
       .setStrokeStyle(1, tower.topColor)
-    const icon = scene.add.rectangle(cardX - 14, cardY, 12, 18, tower.color).setStrokeStyle(1, tower.topColor)
-    const label = scene.add.text(cardX - 2, cardY - 12, tower.name.split(' ')[0], {
-      fontSize: '9px',
+
+    const textX = iconX + shopCfg.iconWidth / 2 + 6
+    const nameText = scene.add.text(textX, -4, towerLabel, {
+      fontSize: shopCfg.cardLabelFontSize,
       color: CONFIG.ui.textColor,
     })
-    const cost = scene.add.text(cardX - 2, cardY + 2, `${tower.cost}c`, {
-      fontSize: '10px',
+    const costText = scene.add.text(textX, 12, `${tower.cost}c`, {
+      fontSize: shopCfg.cardCostFontSize,
       color: '#ffd56a',
       fontStyle: 'bold',
     })
-    for (const obj of [card, icon, label, cost]) obj.setInteractive({ useHandCursor: true })
-    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
-    icon.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
-    label.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
-    cost.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
-    return { type, x: cardX, y: cardY, width: SHOP_CARD_WIDTH, height: SHOP_CARD_HEIGHT }
-  })
-}
 
-export function nearestFreePad(x: number, y: number, pads: readonly BuildPad[]): BuildPad | undefined {
-  return pads
-    .filter((pad) => !pad.occupiedBy)
-    .filter((pad) => distanceBetween(pad, { x, y }) <= CONFIG.run.buildSpotRadius)
-    .sort((a, b) => distanceBetween(a, { x, y }) - distanceBetween(b, { x, y }))[0]
+    card.add([cardBg, icon, nameText, costText])
+    card.setSize(cardWidth, cardHeight)
+    card.setInteractive(new Phaser.Geom.Rectangle(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains)
+    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
+
+    return { type, x: centerX, y: centerY, width: cardWidth, height: cardHeight }
+  })
 }
 
 function isNearPathPoint(x: number, y: number, radius: number): boolean {

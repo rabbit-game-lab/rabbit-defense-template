@@ -3,7 +3,16 @@ import { PATH, WAVES } from '../data/towerDefense'
 import { EnemyView, type EnemyRuntime } from '../entities/EnemyView'
 import { createProjectile, type ProjectileRuntime } from '../entities/ProjectileView'
 import { chooseTowerTarget, damageEnemy, advanceEnemyAlongPath, distanceBetween } from './towerDefenseRules'
-import { createWaveState, isFinalWaveComplete, makeEnemyStats, markEnemySpawned, nextEnemyToSpawn } from './waves'
+import {
+  createWaveState,
+  isFinalWaveComplete,
+  makeEnemyStats,
+  markEnemySpawned,
+  nextEnemyToSpawn,
+  prepareFirstWaveForCombat,
+  waveProgressSnapshot,
+  type WaveProgressSnapshot,
+} from './waves'
 import { playDefeatSfx, playLeakSfx, playShotSfx } from './audioManager'
 import type { TowerRuntime } from '../entities/TowerView'
 
@@ -24,7 +33,7 @@ export default class CombatSystem {
   constructor(scene: Phaser.Scene, callbacks: CombatCallbacks) {
     this.scene = scene
     this.callbacks = callbacks
-    this.waveState = createWaveState(this.scene.time.now + CONFIG.run.waveStartDelayMs, CONFIG.waves.betweenWaveDelayMs)
+    this.waveState = createWaveState(this.scene.time.now, CONFIG.waves.betweenWaveDelayMs, CONFIG.waves.firstWavePrepareDelayMs)
   }
 
   get currentWave(): number {
@@ -41,6 +50,14 @@ export default class CombatSystem {
 
   get activeEnemyCount(): number {
     return this.enemies.length
+  }
+
+  getWaveProgress(): WaveProgressSnapshot {
+    return waveProgressSnapshot(this.waveState, this.scene.time.now, this.enemies.length)
+  }
+
+  prepareFirstWave(now: number): void {
+    prepareFirstWaveForCombat(this.waveState, now)
   }
 
   update(delta: number, towers: readonly TowerRuntime[]): void {
@@ -61,7 +78,6 @@ export default class CombatSystem {
   private spawnEnemies(now: number): void {
     const type = nextEnemyToSpawn(this.waveState, now)
     if (!type) return
-
     const stats = makeEnemyStats(type, this.waveState.waveIndex)
     const start = PATH[0]
     const view = new EnemyView(this.scene, stats, start.x, start.y)
@@ -79,7 +95,6 @@ export default class CombatSystem {
       view,
     })
     markEnemySpawned(this.waveState, now)
-    this.callbacks.onStatusUpdate(`Wave ${Math.min(this.waveState.waveIndex + 1, this.totalWaves)} incoming!`)
   }
 
   private updateEnemies(delta: number, now: number): boolean {

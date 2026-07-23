@@ -4,20 +4,49 @@ import {
   canAffordTower,
   chooseTowerTarget,
   computeTowerUpgrade,
+  createTowerUpgradePreview,
+  resolveTowerUpgradeRequest,
+  resolvePlacementDrop,
+  findNearestPadWithinRadius,
   damageEnemy,
   distanceBetween,
   evaluateSlowImpact,
+  formatTowerUpgradePreview,
   refundForTower,
   spendCoins,
 } from '../.tmp-tests/src/systems/towerDefenseRules.js'
-import { createRunState, finishRun, getRunStatus, isRunActive } from '../.tmp-tests/src/systems/runState.js'
+
+import {
+  createRunState,
+  finishRun,
+  getRunStatus,
+  isRunActive,
+} from '../.tmp-tests/src/systems/runState.js'
+
 import {
   createWaveState,
+  prepareFirstWave,
+  createWaveProgressSnapshot,
   isWaveRunComplete,
   markWaveEnemySpawned,
   nextWaveEnemy,
   scaleEnemyStats,
 } from '../.tmp-tests/src/systems/waveRules.js'
+
+import {
+  createTimedHudMessage,
+  getRunFallbackStatus,
+  resolveHudStatus,
+  formatWaveHud,
+} from '../.tmp-tests/src/systems/hudRules.js'
+
+import {
+  applyOnboardingEvent,
+  applyOnboardingPlayerAction,
+  applyObjectiveAutoAdvance,
+  createOnboardingState,
+  getOnboardingInstruction,
+} from '../.tmp-tests/src/systems/onboardingRules.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -30,10 +59,92 @@ assert.equal(canAffordTower(50, { cost: 75 }), false)
 assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
+assert.equal(getRunFallbackStatus(false), 'Drag a tower from the shop to a build circle.')
+assert.equal(getRunFallbackStatus(true), 'Defend the keep — build or upgrade between waves.')
 assert.deepEqual(
-  advanceEnemyAlongPath({ x: 0, y: 0, pathIndex: 0, progress: 0 }, path, 60),
-  { x: 60, y: 0, pathIndex: 0, progress: 60, escaped: false },
+  findNearestPadWithinRadius(
+    { x: 5, y: 0 },
+    [
+      { x: 3, y: 0, occupied: true },
+      { x: 10, y: 0, occupied: false },
+      { x: 20, y: 0, occupied: false },
+    ],
+    12,
+  ),
+  {
+    nearestPad: { x: 3, y: 0, occupied: true },
+    validPad: undefined,
+    valid: false,
+  },
+  'the nearest occupied pad blocks snapping to a different free pad',
 )
+
+const placementSuccess = resolvePlacementDrop(
+  { x: 7, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementSuccess.type, 'success')
+assert.equal(placementSuccess.spendAmount, 50)
+assert.equal(placementSuccess.nextCoins, 30)
+assert.equal(placementSuccess.target?.x, 10)
+
+const placementOutside = resolvePlacementDrop(
+  { x: 200, y: 200 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementOutside.type, 'cancelled')
+assert.equal(placementOutside.reason, 'outside-range')
+assert.equal(placementOutside.spendAmount, 0)
+assert.equal(placementOutside.nextCoins, 80)
+assert.equal(placementOutside.status, 'Drag cancelled — drop on a glowing circle.')
+
+const placementOccupied = resolvePlacementDrop(
+  { x: 3, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  80,
+)
+assert.equal(placementOccupied.type, 'cancelled')
+assert.equal(placementOccupied.reason, 'occupied-pad')
+assert.equal(placementOccupied.spendAmount, 0)
+assert.equal(placementOccupied.nextCoins, 80)
+assert.equal(placementOccupied.status, 'That build circle is already occupied.')
+
+const placementInsufficient = resolvePlacementDrop(
+  { x: 10, y: 0 },
+  [
+    { x: 3, y: 0, occupied: true },
+    { x: 10, y: 0, occupied: false },
+    { x: 20, y: 0, occupied: false },
+  ],
+  12,
+  { towerName: 'Arrow Tower', cost: 50 },
+  20,
+)
+assert.equal(placementInsufficient.type, 'cancelled')
+assert.equal(placementInsufficient.reason, 'insufficient-funds')
+assert.equal(placementInsufficient.spendAmount, 0)
+assert.equal(placementInsufficient.nextCoins, 20)
+assert.equal(placementInsufficient.status, 'Need 50 coins to build Arrow Tower.')
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 80, y: 0, pathIndex: 0, progress: 80 }, path, 50),
   { x: 100, y: 30, pathIndex: 1, progress: 30, escaped: false },
@@ -80,26 +191,201 @@ assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateM
   upgradeCost: 75,
 })
 
+const upgradePreview = createTowerUpgradePreview({
+  level: 1,
+  damage: 8,
+  range: 90,
+  fireRateMs: 700,
+  upgradeCost: 55,
+})
+assert.deepEqual(upgradePreview, {
+  next: {
+    level: 2,
+    damage: 12,
+    range: 100,
+    fireRateMs: 630,
+    upgradeCost: 83,
+  },
+  delta: {
+    damage: 4,
+    range: 10,
+    fireRateMs: -70,
+  },
+  cost: 55,
+  summary: '+4 Damage · +10 Range · -70ms fire rate',
+})
+
+const noSelection = resolveTowerUpgradeRequest(null, 999)
+assert.equal(noSelection.type, 'no-selection')
+assert.equal(noSelection.reason, 'no-selection')
+
+const unaffordable = resolveTowerUpgradeRequest(
+  {
+    level: 1,
+    damage: 8,
+    range: 90,
+    fireRateMs: 700,
+    upgradeCost: 60,
+  },
+  40,
+)
+assert.equal(unaffordable.type, 'insufficient-funds')
+assert.equal(unaffordable.reason, 'insufficient-funds')
+assert.equal(unaffordable.needed, 60)
+
+const affordableUpgrade = resolveTowerUpgradeRequest(
+  {
+    level: 1,
+    damage: 8,
+    range: 90,
+    fireRateMs: 700,
+    upgradeCost: 60,
+  },
+  60,
+)
+assert.equal(affordableUpgrade.type, 'success')
+assert.equal(affordableUpgrade.reason, 'success')
+assert.deepEqual(affordableUpgrade.next, {
+  level: 2,
+  damage: 12,
+  range: 100,
+  fireRateMs: 630,
+  upgradeCost: 90,
+})
+assert.equal(affordableUpgrade.cost, 60)
+assert.equal(affordableUpgrade.remainingCoins, 0)
+
+assert.equal(formatTowerUpgradePreview(upgradePreview), '+4 Damage · +10 Range · -70ms fire rate')
+
 const waves = [
   { enemies: ['a', 'b'], spawnEveryMs: 100 },
   { enemies: ['c'], spawnEveryMs: 50 },
 ]
-const waveState = createWaveState(1000, 300)
-assert.equal(nextWaveEnemy(waveState, 999, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1000, waves), 'a', 'first enemy spawns exactly at startAt')
-markWaveEnemySpawned(waveState, 1000, waves)
-assert.equal(nextWaveEnemy(waveState, 1099, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1100, waves), 'b')
-markWaveEnemySpawned(waveState, 1100, waves)
+const waveState = createWaveState(1000, 300, 3000)
+assert.equal(nextWaveEnemy(waveState, 1000, waves), undefined, 'first wave is blocked until a tower is placed')
+assert.equal(createWaveProgressSnapshot(waveState, 1000, waves, 0).phase, 'preparing', 'snapshot starts in preparing')
+prepareFirstWave(waveState, 1500)
+assert.equal(createWaveProgressSnapshot(waveState, 3000, waves, 0).phase, 'preparing', 'snapshot remains in preparing during first countdown')
+assert.equal(nextWaveEnemy(waveState, 4499, waves), undefined, 'first tower signal schedules delayed first spawn')
+assert.equal(createWaveProgressSnapshot(waveState, 4499, waves, 0).nextEventMs, 1, 'countdown stays deterministic before first wave')
+assert.equal(nextWaveEnemy(waveState, 4500, waves), 'a', 'deterministic first-wave countdown of 3000ms')
+markWaveEnemySpawned(waveState, 4500, waves)
+assert.equal(createWaveProgressSnapshot(waveState, 4500, waves, 0).phase, 'active', 'first spawn puts wave in active phase')
+assert.equal(nextWaveEnemy(waveState, 4599, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 4600, waves), 'b')
+markWaveEnemySpawned(waveState, 4600, waves)
 assert.equal(waveState.waveIndex, 1)
-assert.equal(waveState.betweenWaveUntil, 1400)
-assert.equal(nextWaveEnemy(waveState, 1399, waves), undefined)
-assert.equal(nextWaveEnemy(waveState, 1400, waves), 'c', 'configured cooldown gates the next wave')
-markWaveEnemySpawned(waveState, 1400, waves)
+assert.equal(waveState.betweenWaveUntil, 4900)
+assert.equal(createWaveProgressSnapshot(waveState, 4850, waves, 0).phase, 'between', 'between phase is explicit and timed')
+assert.equal(createWaveProgressSnapshot(waveState, 4850, waves, 0).nextEventMs, 50, 'next event countdown tracks delay before next wave')
+assert.equal(nextWaveEnemy(waveState, 4899, waves), undefined)
+assert.equal(nextWaveEnemy(waveState, 4900, waves), 'c', 'configured cooldown gates the next wave')
+markWaveEnemySpawned(waveState, 4900, waves)
 assert.equal(isWaveRunComplete(waveState, waves.length), true)
+const completeSnapshot = createWaveProgressSnapshot(waveState, 9999, waves, 0)
+assert.equal(completeSnapshot.phase, 'complete', 'complete phase at no waves left and no active enemies')
+assert.equal(completeSnapshot.nextEventMs, 0)
+assert.equal(completeSnapshot.toSpawnInCurrentWave, 0)
 assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })
+
+assert.deepEqual(createTimedHudMessage(' ', 100, 1000), undefined)
+assert.deepEqual(createTimedHudMessage('Ready', 1000, 250), { text: 'Ready', expiresAtMs: 1250 })
+
+const now = 1000
+const placementMessage = createTimedHudMessage('Place tower here', now, 700)
+const combatMessage = createTimedHudMessage('Kill confirmed', now, 1000)
+const fallback = 'Stay calm'
+assert.equal(resolveHudStatus(now + 100, placementMessage, combatMessage, fallback), 'Place tower here', 'placement dominates while both valid')
+assert.equal(resolveHudStatus(now + 700, placementMessage, combatMessage, fallback), 'Kill confirmed', 'expiry boundary falls through to combat')
+assert.equal(resolveHudStatus(now + 900, placementMessage, combatMessage, fallback), 'Kill confirmed', 'combat appears when placement has expired')
+assert.equal(resolveHudStatus(now + 1300, placementMessage, combatMessage, fallback), fallback, 'fallback used after both temporary messages expire')
+assert.equal(resolveHudStatus(now + 1, undefined, undefined, fallback), fallback, 'fallback is always available')
+
+const mkSnapshot = (phase, nextEventMs, toSpawn, wave = 1, totalWaves = 5, active = 0) =>
+  formatWaveHud(
+    {
+      wave,
+      totalWaves,
+      phase,
+      toSpawnInCurrentWave: toSpawn,
+      nextEventMs,
+    },
+    active,
+  )
+
+assert.equal(mkSnapshot('preparing', 0, 6), 'Build your first tower')
+assert.equal(mkSnapshot('preparing', 1200, 0), 'Wave 1 starts in 2s')
+assert.equal(mkSnapshot('active', 2000, 4, 3, 5, 1), 'Wave 3 · 5 left')
+assert.equal(mkSnapshot('between', 1000, 4, 4, 5, 0), 'Wave 4 starts in 1s')
+assert.equal(mkSnapshot('between', 2000, 4, 4, 5, 1), 'Wave 3 · 1 active · Next 2s')
+assert.equal(mkSnapshot('between', 2300, 4, 2, 5, 3), 'Wave 1 · 3 active · Next 3s')
+assert.equal(mkSnapshot('complete', 0, 0, 5, 5, 0), 'All waves cleared')
+
+const onboardingConfig = { objectiveAutoAdvanceMs: 1700 }
+let onboardingState = createOnboardingState(0, onboardingConfig, false)
+assert.equal(onboardingState.step, 'objective')
+assert.equal(getOnboardingInstruction(onboardingState.step), 'Objective: defend the keep, then place and upgrade towers to survive all waves.')
+
+onboardingState = applyObjectiveAutoAdvance(onboardingState, 1200).state
+assert.equal(onboardingState.step, 'objective')
+assert.equal(applyObjectiveAutoAdvance(onboardingState, 1700).state.step, 'place', 'objective auto-advances after configured delay')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-upgraded', 2000).state
+assert.equal(onboardingState.step, 'objective', 'upgrades do not advance objective')
+
+let transition = applyOnboardingEvent(onboardingState, 'tower-placed', 2500)
+assert.equal(transition.didTransition, false, 'placement cannot advance before objective deadline')
+assert.equal(transition.state.step, 'objective')
+
+const fastPlacement = applyOnboardingPlayerAction(createOnboardingState(0, onboardingConfig, false), 'tower-placed', 250)
+assert.equal(fastPlacement.didTransition, true)
+assert.equal(fastPlacement.state.step, 'upgrade', 'early placement acknowledges objective and completes placement step')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = { ...onboardingState, autoAdvanceAtMs: 1000 }
+onboardingState = applyObjectiveAutoAdvance(onboardingState, 1800).state
+assert.equal(onboardingState.step, 'place')
+transition = applyOnboardingEvent(onboardingState, 'tower-placed', 1800)
+onboardingState = transition.state
+assert.equal(transition.didTransition, true)
+assert.equal(onboardingState.step, 'upgrade', 'tower placement advances from place only')
+
+transition = applyOnboardingEvent(onboardingState, 'skip', 1900)
+assert.equal(transition.didTransition, true)
+assert.equal(transition.state.step, 'complete')
+assert.equal(applyOnboardingEvent(transition.state, 'skip', 2000).didTransition, false, 'complete is immutable')
+
+const completedConfigState = createOnboardingState(0, onboardingConfig, true)
+assert.equal(completedConfigState.step, 'complete')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state, 'tower-placed', 0).state
+assert.equal(onboardingState.step, 'upgrade')
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 1).state
+assert.equal(onboardingState.step, 'upgrade')
+
+onboardingState = createOnboardingState(0, onboardingConfig, false)
+onboardingState = applyObjectiveAutoAdvance({ ...onboardingState, autoAdvanceAtMs: 0 }, 0).state
+onboardingState = applyOnboardingEvent(onboardingState, 'tower-placed', 0).state
+assert.equal(onboardingState.step, 'upgrade', 'tower placement advances into upgrade')
+
+const finalUpgrade = applyOnboardingEvent(onboardingState, 'tower-upgraded', 0)
+assert.equal(finalUpgrade.didTransition, true)
+assert.equal(finalUpgrade.state.step, 'complete', 'upgrade from upgrade advances to complete')
+
+let skippedFromPlace = createOnboardingState(0, onboardingConfig, false)
+skippedFromPlace = applyOnboardingEvent(applyObjectiveAutoAdvance({ ...skippedFromPlace, autoAdvanceAtMs: 0 }, 0).state, 'skip', 0).state
+assert.equal(skippedFromPlace.step, 'complete')
+
+const skippedFromObjective = createOnboardingState(0, onboardingConfig, false)
+assert.equal(applyOnboardingEvent(skippedFromObjective, 'skip', 0).state.step, 'complete')
+
+const skippedFromUpgrade = applyOnboardingEvent(applyOnboardingEvent(applyOnboardingEvent({ ...createOnboardingState(0, onboardingConfig, false), autoAdvanceAtMs: 0 }, 'objective-viewed', 0).state, 'tower-placed', 0).state, 'skip', 0)
+assert.equal(skippedFromUpgrade.didTransition, true)
+assert.equal(skippedFromUpgrade.state.step, 'complete')
 
 const running = createRunState(100)
 assert.equal(isRunActive(running), true)
@@ -111,4 +397,4 @@ const repeated = finishRun(victory.state, 'defeat', 900)
 assert.equal(repeated.didTransition, false, 'terminal transition is idempotent')
 assert.equal(repeated.state, victory.state, 'repeated finish preserves the original object and outcome')
 
-console.log('towerDefenseRules, waveRules, and runState tests passed')
+console.log('towerDefenseRules, waveRules, onboardingRules, hudRules, and runState tests passed')

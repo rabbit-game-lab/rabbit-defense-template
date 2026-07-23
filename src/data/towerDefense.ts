@@ -59,12 +59,6 @@ export const BUILD_SPOTS: readonly Point[] = [
 
 export const SHOP_TOWER_ORDER: readonly TowerType[] = ['arrow', 'frost', 'bomb']
 
-export const SHOP_CARD_WIDTH = 52
-export const SHOP_CARD_HEIGHT = 34
-export const SHOP_CARD_SPACING_X = 61
-export const SHOP_PANEL = { x: 694, y: 58, width: 196, height: 78 }
-export const SHOP_CARD_START = { x: 590, y: 24 }
-
 export const TOWERS: Record<TowerType, TowerDefinition> = {
   arrow: {
     type: 'arrow',
