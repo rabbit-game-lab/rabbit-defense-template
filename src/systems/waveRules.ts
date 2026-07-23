@@ -104,6 +104,20 @@ export function createWaveProgressSnapshot<TEnemy>(
     }
   }
 
+  if (
+    state.waveIndex === 0 &&
+    state.firstWaveReadyAt !== Number.POSITIVE_INFINITY &&
+    now < state.firstWaveReadyAt
+  ) {
+    return {
+      wave: state.waveIndex + 1,
+      totalWaves: waves.length,
+      phase: 'preparing',
+      toSpawnInCurrentWave: waves[state.waveIndex]?.enemies.length ?? 0,
+      nextEventMs: Math.max(0, state.nextSpawnAt - now),
+    }
+  }
+
   if (state.waveIndex === 0 && state.firstWaveReadyAt === Number.POSITIVE_INFINITY) {
     return {
       wave: state.waveIndex + 1,
