@@ -1,0 +1,9 @@
+{
+  "contract": 1,
+  "stack": "phaser-2d",
+  "embed": {
+    "audio": true,
+    "pointerLock": false,
+    "storage": true
+  }
+}

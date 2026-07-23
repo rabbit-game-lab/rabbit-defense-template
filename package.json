@@ -1,0 +1,24 @@
+{
+  "name": "rabbit-defense",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Rabbit Defense: a pixel-art medieval forest tower defense template for Rabbit Game Lab.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "check": "node scripts/check.mjs",
+    "test:rules": "rm -rf .tmp-tests && tsc --noEmit false --outDir .tmp-tests && node scripts/test-rules.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^8.0.3"
+  }
+}
