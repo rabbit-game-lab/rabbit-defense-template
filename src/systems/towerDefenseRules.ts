@@ -160,7 +160,7 @@ export function resolvePlacementDrop(
       target: validPad,
       spendAmount: 0,
       nextCoins: currentCoins,
-      status: `Need ${tower.cost} coins to build ${tower.towerName}.`,
+      status: `Need ${tower.cost} ryo to build ${tower.towerName}.`,
     }
   }
 

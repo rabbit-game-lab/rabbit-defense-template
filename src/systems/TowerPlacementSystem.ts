@@ -149,7 +149,7 @@ export default class TowerPlacementSystem {
         this.placeTower(definition, pad)
         this.options.onStatusUpdate(outcome.status)
       } else {
-        this.options.onStatusUpdate(`Could not spend ${definition.cost} coins now.`)
+        this.options.onStatusUpdate(`Could not spend ${definition.cost} ryo now.`)
       }
       return
     }
@@ -196,13 +196,13 @@ export default class TowerPlacementSystem {
 
     switch (outcome.type) {
       case 'no-selection':
-        this.options.onStatusUpdate('Select a tower first to upgrade it.')
+        this.options.onStatusUpdate('Select a defense first to upgrade it.')
         return false
       case 'insufficient-funds':
-        this.options.onStatusUpdate(`Need ${outcome.needed} coins to upgrade.`)
+        this.options.onStatusUpdate(`Need ${outcome.needed} ryo to upgrade.`)
         return false
       case 'max-level':
-        this.options.onStatusUpdate('This tower is already at MAX LEVEL.')
+        this.options.onStatusUpdate('This defense is already at MAX LEVEL.')
         return false
       case 'success':
         break
@@ -236,7 +236,7 @@ export default class TowerPlacementSystem {
 
     const selected = this.towers.find((item) => item.id === this.selectedTowerId)
     if (!selected) {
-      this.options.onStatusUpdate('Select a tower first to sell it.')
+      this.options.onStatusUpdate('Select a defense first to sell it.')
       return false
     }
 
@@ -249,7 +249,7 @@ export default class TowerPlacementSystem {
     this.selectedTowerId = undefined
 
     if (this.options.onTowerSold) this.options.onTowerSold(refund)
-    this.options.onStatusUpdate(`Sold ${TOWERS[selected.type].name} for ${refund} coins.`)
+    this.options.onStatusUpdate(`Sold ${TOWERS[selected.type].name} for ${refund} ryo.`)
     return true
   }
 

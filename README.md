@@ -1,26 +1,27 @@
-# Rabbit Defense
+# Hidden Dojo Defense
 
-A pixel-art medieval forest tower defense template for Rabbit Game Lab, built from the Rabbit 2D base template with Phaser 3, Vite, and TypeScript.
+A pixel-art ninja tower-defense template for Rabbit Game Lab, built from the Rabbit 2D base template with Phaser 3, Vite, and TypeScript.
 
 ## Game loop
 
-- Drag towers from the shop onto golden build circles.
-- Stop monsters from reaching the rabbit keep.
-- Earn coins from defeated enemies.
-- Tap an already-selected tower to upgrade it when you have enough coins.
-- Survive all 5 fixed waves to win.
+- Drag ninja defenses from the shop onto glowing build seals.
+- Stop rival clans from reaching Hidden Dojo.
+- Earn ryo from defeated raiders.
+- Select a placed defense to upgrade or sell it.
+- Survive all 10 fixed raids and defeat the Crimson Bear Shogun.
 
-## Towers
+## Defenses
 
-- **Arrow Tower** — fast single-target shots.
-- **Frost Mage** — low damage, slows monsters.
-- **Bombard** — slow splash damage.
+- **Shuriken Tower** — fast single-target shuriken.
+- **Ice Shrine** — low damage, slows raiders.
+- **Fire Mortar** — slow splash damage.
 
-## Enemies
+## Raiders
 
-- **Goblin** — baseline grunt.
-- **Imp Runner** — fast but weak.
-- **Ogre** — slow tank with more health.
+- **Scout Mouse** — baseline scout.
+- **Rogue Raccoon** — fast but weak.
+- **Iron Panda** — slow tank with more health.
+- **Crimson Bear Shogun** — final boss that resists new slows.
 
 ## Commands
 
@@ -32,9 +33,14 @@ npm run check
 npm run build
 ```
 
+## Asset license
+
+The runtime art is a curated derivative subset of the CC0 **Ninja Adventure Asset Pack** by Pixel-Boy and AAA. Source, hash, derivative details, and the original license are preserved in [`public/assets/ninja/README.md`](public/assets/ninja/README.md).
+
 ## Rabbit template notes
 
 - Gameplay tuning lives in `src/game.config.ts`.
-- Tower/enemy/wave data lives in `src/data/towerDefense.ts`.
+- Defense, raider, and raid data lives in `src/data/towerDefense.ts`.
 - Core pure rules are in `src/systems/towerDefenseRules.ts` and covered by `npm run test:rules`.
+- Stable source IDs such as `arrow` and `warden` remain unchanged for rules/save compatibility.
 - Rabbit platform wiring remains in `src/main.ts` and `src/rabbit/sdk.ts`.

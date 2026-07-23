@@ -2,7 +2,7 @@
   "name": "rabbit-defense",
   "private": true,
   "version": "1.0.0",
-  "description": "Rabbit Defense: a pixel-art medieval forest tower defense template for Rabbit Game Lab.",
+  "description": "Hidden Dojo Defense: a pixel-art ninja tower defense template for Rabbit Game Lab.",
   "type": "module",
   "engines": {
     "node": ">=24"

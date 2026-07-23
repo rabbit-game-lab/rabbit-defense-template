@@ -140,15 +140,15 @@ export default class UIScene extends Phaser.Scene {
 
     const hud = game.getHudState()
 
-    this.statsLine.setText(`Coins ${hud.coins}   Lives ${hud.lives}`)
+    this.statsLine.setText(`Ryo ${hud.coins}   Dojo HP ${hud.lives}`)
     this.waveLine.setText(hud.waveLabel)
 
     if (!hud.selectedTower) {
-      this.selectedLine.setText('Selected: none')
+      this.selectedLine.setText('Defense: none')
       this.setButtonEnabled(this.upgradeButton, false)
       this.setButtonEnabled(this.sellButton, false)
-      this.upgradeButton.text.setText('Upgrade · 0c')
-      this.previewLine.setText('No tower selected.')
+      this.upgradeButton.text.setText('Upgrade · 0 ryo')
+      this.previewLine.setText('No defense selected.')
       this.statusLine.setText(hud.status)
     } else {
       this.selectedLine.setText(
@@ -157,10 +157,10 @@ export default class UIScene extends Phaser.Scene {
       this.statusLine.setText(hud.status)
       this.previewLine.setText(
         hud.selectedTower.maxed
-          ? `MAX level. Sell for ${hud.selectedTower.sellRefund}c.`
+          ? `MAX level. Sell for ${hud.selectedTower.sellRefund} ryo.`
           : `Next: ${hud.selectedTower.upgrade.summary}`,
       )
-      this.upgradeButton.text.setText(`Upgrade · ${hud.selectedTower.upgradeCost}c`)
+      this.upgradeButton.text.setText(`Upgrade · ${hud.selectedTower.upgradeCost} ryo`)
       this.setButtonEnabled(this.upgradeButton, !hud.selectedTower.maxed && hud.selectedTower.affordable)
       this.setButtonEnabled(this.sellButton, hud.selectedTower.sellEnabled)
     }
@@ -215,13 +215,13 @@ export default class UIScene extends Phaser.Scene {
       this.resultPanel.replay.bg.on('pointerdown', () => this.handleReplay())
     }
 
-    this.resultPanel.title.setText(result.outcome === 'victory' ? 'Run Complete: Victory' : 'Run Complete: Defeat')
+    this.resultPanel.title.setText(result.outcome === 'victory' ? 'Dojo Secured: Victory' : 'Dojo Fallen: Defeat')
     this.resultPanel.resultLine.setText(
-      `Waves: ${result.wavesCleared}/${result.wavesReached} • Kills ${result.kills} • Leaks ${result.leaks} • ${Math.round(result.durationMs / 1000)}s`,
+      `Raids: ${result.wavesCleared}/${result.wavesReached} • Defeated ${result.kills} • Breaches ${result.leaks} • ${Math.round(result.durationMs / 1000)}s`,
     )
-    this.resultPanel.statsLine.setText(`Lives remaining: ${result.livesRemaining}   Coins remaining: ${result.coinsRemaining}`)
+    this.resultPanel.statsLine.setText(`Dojo HP: ${result.livesRemaining}   Ryo: ${result.coinsRemaining}`)
     this.resultPanel.recordsLine.setText(
-      `Profile — Wins ${hud.profile.wins}  Losses ${hud.profile.defeats}  Best Lives ${hud.profile.bestLives}  Best Coins ${hud.profile.bestCoins}  Fastest ${hud.profile.fastestWinMs}ms`,
+      `Profile — Wins ${hud.profile.wins}  Losses ${hud.profile.defeats}  Best Dojo HP ${hud.profile.bestLives}  Best Ryo ${hud.profile.bestCoins}  Fastest ${hud.profile.fastestWinMs}ms`,
     )
   }
 
