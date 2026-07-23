@@ -27,7 +27,6 @@ export default class UIScene extends Phaser.Scene {
 
   create(): void {
     const hud = CONFIG.ui.hud
-    const upgradeButtonHeight = Math.max(hud.upgradeButtonHeight, 44)
 
     this.add
       .rectangle(hud.topRowX, hud.topRowY + hud.topRowHeight / 2, hud.topRowWidth, hud.topRowHeight, CONFIG.ui.panelColor, 0.9)
@@ -87,10 +86,7 @@ export default class UIScene extends Phaser.Scene {
         0.95,
       )
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.33)
-      .setInteractive(
-        new Phaser.Geom.Rectangle(-hud.upgradeButtonWidth / 2, -upgradeButtonHeight / 2, hud.upgradeButtonWidth, upgradeButtonHeight),
-        Phaser.Geom.Rectangle.Contains,
-      )
+      .setInteractive()
 
     this.upgradeButtonBg.on('pointerover', () => {
       if (this.upgradeEnabled) this.input.setDefaultCursor('pointer')
