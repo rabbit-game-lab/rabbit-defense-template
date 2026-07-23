@@ -4,13 +4,23 @@ import {
   canAffordTower,
   chooseTowerTarget,
   computeTowerUpgrade,
+  createTowerUpgradePreview,
+  resolveTowerUpgradeRequest,
   damageEnemy,
   distanceBetween,
   evaluateSlowImpact,
+  formatTowerUpgradePreview,
   refundForTower,
   spendCoins,
 } from '../.tmp-tests/src/systems/towerDefenseRules.js'
-import { createRunState, finishRun, getRunStatus, isRunActive } from '../.tmp-tests/src/systems/runState.js'
+
+import {
+  createRunState,
+  finishRun,
+  getRunStatus,
+  isRunActive,
+} from '../.tmp-tests/src/systems/runState.js'
+
 import {
   createWaveState,
   prepareFirstWave,
@@ -81,6 +91,72 @@ assert.deepEqual(computeTowerUpgrade({ level: 1, damage: 8, range: 90, fireRateM
   fireRateMs: 630,
   upgradeCost: 75,
 })
+
+const upgradePreview = createTowerUpgradePreview({
+  level: 1,
+  damage: 8,
+  range: 90,
+  fireRateMs: 700,
+  upgradeCost: 55,
+})
+assert.deepEqual(upgradePreview, {
+  next: {
+    level: 2,
+    damage: 12,
+    range: 100,
+    fireRateMs: 630,
+    upgradeCost: 83,
+  },
+  delta: {
+    damage: 4,
+    range: 10,
+    fireRateMs: -70,
+  },
+  cost: 55,
+  summary: '+4 Damage · +10 Range · -70ms fire rate',
+})
+
+const noSelection = resolveTowerUpgradeRequest(null, 999)
+assert.equal(noSelection.type, 'no-selection')
+assert.equal(noSelection.reason, 'no-selection')
+
+const unaffordable = resolveTowerUpgradeRequest(
+  {
+    level: 1,
+    damage: 8,
+    range: 90,
+    fireRateMs: 700,
+    upgradeCost: 60,
+  },
+  40,
+)
+assert.equal(unaffordable.type, 'insufficient-funds')
+assert.equal(unaffordable.reason, 'insufficient-funds')
+assert.equal(unaffordable.needed, 60)
+
+const affordableUpgrade = resolveTowerUpgradeRequest(
+  {
+    level: 1,
+    damage: 8,
+    range: 90,
+    fireRateMs: 700,
+    upgradeCost: 60,
+  },
+  60,
+)
+assert.equal(affordableUpgrade.type, 'success')
+assert.equal(affordableUpgrade.reason, 'success')
+assert.deepEqual(affordableUpgrade.next, {
+  level: 2,
+  damage: 12,
+  range: 100,
+  fireRateMs: 630,
+  upgradeCost: 90,
+})
+assert.equal(affordableUpgrade.cost, 60)
+assert.equal(affordableUpgrade.remainingCoins, 0)
+
+assert.equal(formatTowerUpgradePreview(upgradePreview), '+4 Damage · +10 Range · -70ms fire rate')
 
 const waves = [
   { enemies: ['a', 'b'], spawnEveryMs: 100 },

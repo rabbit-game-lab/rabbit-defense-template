@@ -6,18 +6,38 @@ import {
   nearestFreePad,
   type BuildPad,
 } from './gameBoard'
-import { computeTowerUpgrade } from './towerDefenseRules'
+import {
+  createTowerUpgradePreview,
+  resolveTowerUpgradeRequest,
+  type TowerUpgradeRequestOutcome,
+  type TowerUpgradeStats,
+  type TowerUpgradePreview,
+} from './towerDefenseRules'
 import { playBuildSfx, playClickSfx } from './audioManager'
 import { TowerView, type TowerRuntime } from '../entities/TowerView'
 
+export interface TowerPlacementSelectedTower {
+  id: string
+  name: string
+  type: TowerType
+  level: number
+  damage: number
+  range: number
+  fireRateMs: number
+  upgradeCost: number
+  affordable: boolean
+  upgrade: TowerUpgradePreview
+}
+
 export interface TowerPlacementSnapshot {
-  selectedTowerText: string
+  selectedTower: TowerPlacementSelectedTower | null
 }
 
 interface TowerPlacementOptions {
+  canInteract: () => boolean
+  getCurrentCoins: () => number
   spendCoins: (amount: number) => boolean
   onStatusUpdate: (status: string) => void
-  canInteract: () => boolean
   onFirstTowerPlaced?: () => void
 }
 
@@ -48,10 +68,29 @@ export default class TowerPlacementSystem {
     return this.towers
   }
 
-  getSnapshot(): TowerPlacementSnapshot {
+  getSnapshot(currentCoins = 0): TowerPlacementSnapshot {
     const selected = this.towers.find((tower) => tower.id === this.selectedTowerId)
+    if (!selected) return { selectedTower: null }
+
+    const preview = createTowerUpgradePreview(selected)
+    const upgradeRequest = this.resolveUpgradeRequest(selected, currentCoins)
+
     return {
-      selectedTowerText: selected ? `${TOWERS[selected.type].name} L${selected.level}` : 'none',
+      selectedTower: {
+        id: selected.id,
+        name: TOWERS[selected.type].name,
+        type: selected.type,
+        level: selected.level,
+        damage: selected.damage,
+        range: selected.range,
+        fireRateMs: selected.fireRateMs,
+        upgradeCost: selected.upgradeCost,
+        affordable: upgradeRequest.type === 'success',
+        upgrade: {
+          ...preview,
+          cost: selected.upgradeCost,
+        },
+      },
     }
   }
 
@@ -91,7 +130,9 @@ export default class TowerPlacementSystem {
     if (!this.draggingType || !this.options.canInteract()) return
 
     const type = this.draggingType
+    const definition = TOWERS[type]
     const pad = nearestFreePad(pointer.worldX, pointer.worldY, this.pads)
+
     this.dragGhost?.destroy()
     this.dragGhost = undefined
     this.draggingType = undefined
@@ -102,16 +143,21 @@ export default class TowerPlacementSystem {
       return
     }
 
-    this.placeTower(type, pad)
-  }
+    const currentCoins = this.options.getCurrentCoins()
+    if (currentCoins < definition.cost) {
+      this.options.onStatusUpdate(`Need ${definition.cost} coins for ${definition.name}.`)
+      return
+    }
 
-  private placeTower(type: TowerType, pad: BuildPad): void {
-    const definition = TOWERS[type]
     if (!this.options.spendCoins(definition.cost)) {
       this.options.onStatusUpdate(`Need ${definition.cost} coins for ${definition.name}.`)
       return
     }
 
+    this.placeTower(definition, pad)
+  }
+
+  private placeTower(definition: typeof TOWERS[keyof typeof TOWERS], pad: BuildPad): void {
     const view = new TowerView(this.scene, definition, pad.x, pad.y)
     const tower: TowerRuntime = {
       ...definition,
@@ -123,12 +169,13 @@ export default class TowerPlacementSystem {
       nextShotAt: 0,
       view,
     }
+
     pad.occupiedBy = tower.id
     this.towers.push(tower)
     this.selectTower(tower.id)
     view.container.setInteractive(new Phaser.Geom.Rectangle(-22, -26, 44, 52), Phaser.Geom.Rectangle.Contains)
-    view.container.on('pointerdown', () => this.selectOrUpgradeTower(tower.id))
-    this.options.onStatusUpdate(`${definition.name} built. Tap it with enough coins to upgrade.`)
+    view.container.on('pointerdown', () => this.selectTower(tower.id))
+    this.options.onStatusUpdate(`${definition.name} built. Tap to select it.`)
     playBuildSfx()
 
     if (!this.hasPlacedFirstTower) {
@@ -137,30 +184,56 @@ export default class TowerPlacementSystem {
     }
   }
 
-  private selectOrUpgradeTower(id: string): void {
-    if (!this.options.canInteract()) return
-
-    if (this.selectedTowerId !== id) {
-      this.selectTower(id)
-      return
+  upgradeSelectedTower(): boolean {
+    if (!this.options.canInteract()) {
+      this.options.onStatusUpdate('Cannot upgrade right now.')
+      return false
     }
 
-    const tower = this.towers.find((item) => item.id === id)
-    if (!tower) return
+    const tower = this.towers.find((item) => item.id === this.selectedTowerId)
+    const outcome = this.resolveUpgradeRequest(tower ?? null, this.options.getCurrentCoins())
 
-    if (!this.options.spendCoins(tower.upgradeCost)) {
-      this.options.onStatusUpdate(`Need ${tower.upgradeCost} coins to upgrade.`)
-      return
+    switch (outcome.type) {
+      case 'no-selection':
+        this.options.onStatusUpdate('Select a tower first to upgrade it.')
+        return false
+      case 'insufficient-funds':
+        this.options.onStatusUpdate(`Need ${outcome.needed} coins to upgrade.`)
+        return false
+      case 'success':
+        break
     }
 
-    Object.assign(tower, computeTowerUpgrade(tower))
-    tower.view.setLevel(tower.level)
-    tower.view.setSelected(true)
-    this.options.onStatusUpdate(`${TOWERS[tower.type].name} upgraded to level ${tower.level}.`)
+    if (!this.options.spendCoins(outcome.cost)) {
+      this.options.onStatusUpdate('Could not upgrade now. Try again.')
+      return false
+    }
+
+    Object.assign(tower as TowerUpgradeStats, outcome.next)
+    tower!.view.setLevel(tower!.level)
+    tower!.view.setSelected(true)
+    this.options.onStatusUpdate(`${TOWERS[tower!.type].name} upgraded to level ${tower!.level}.`)
     playBuildSfx()
+    return true
   }
 
-  private selectTower(id?: string): void {
+  private resolveUpgradeRequest(tower: TowerRuntime | null, currentCoins: number): TowerUpgradeRequestOutcome {
+    if (!tower) return resolveTowerUpgradeRequest(null, currentCoins)
+
+    const selected: TowerUpgradeStats = {
+      level: tower.level,
+      damage: tower.damage,
+      range: tower.range,
+      fireRateMs: tower.fireRateMs,
+      upgradeCost: tower.upgradeCost,
+    }
+
+    return resolveTowerUpgradeRequest(selected, currentCoins)
+  }
+
+  private selectTower(id: string): void {
+    if (!this.options.canInteract()) return
+
     this.selectedTowerId = id
     for (const tower of this.towers) tower.view.setSelected(tower.id === id)
   }

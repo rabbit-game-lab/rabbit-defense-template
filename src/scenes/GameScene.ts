@@ -3,7 +3,7 @@ import { CONFIG } from '../game.config'
 import { finishRun, createRunState, isRunActive, type RunState } from '../systems/runState'
 import { createBattleBackground, createHeader, drawPath } from '../systems/gameBoard'
 import { playFanfareSfx } from '../systems/audioManager'
-import TowerPlacementSystem from '../systems/TowerPlacementSystem'
+import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
 import type { WaveProgressSnapshot } from '../systems/waves'
 
@@ -16,7 +16,7 @@ export interface HudState {
   enemiesToSpawn: number
   activeEnemies: number
   nextWaveInMs: number
-  selectedTower: string
+  selectedTower: TowerPlacementSnapshot['selectedTower']
   status: string
 }
 
@@ -60,6 +60,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.placement = new TowerPlacementSystem(this, {
       canInteract: () => isRunActive(this.runState),
+      getCurrentCoins: () => this.coins,
       spendCoins: (amount: number): boolean => {
         if (this.coins < amount) return false
         this.coins -= amount
@@ -98,9 +99,13 @@ export default class GameScene extends Phaser.Scene {
       enemiesToSpawn: waveProgress.toSpawnInCurrentWave,
       activeEnemies: this.combat.activeEnemyCount,
       nextWaveInMs: waveProgress.nextEventMs,
-      selectedTower: this.placement.getSnapshot().selectedTowerText,
+      selectedTower: this.placement.getSnapshot(this.coins).selectedTower,
       status: this.status,
     }
+  }
+
+  upgradeSelectedTower(): boolean {
+    return this.placement.upgradeSelectedTower()
   }
 
   private checkWinState(): void {

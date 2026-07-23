@@ -52,6 +52,35 @@ export interface TowerUpgradeStats {
   upgradeCost: number
 }
 
+export interface TowerUpgradeDeltas {
+  damage: number
+  range: number
+  fireRateMs: number
+}
+
+export interface TowerUpgradePreview {
+  next: TowerUpgradeStats
+  delta: TowerUpgradeDeltas
+  cost: number
+  summary: string
+}
+
+export type TowerUpgradeRequestOutcome = {
+    type: 'no-selection'
+    reason: 'no-selection'
+  } | {
+    type: 'insufficient-funds'
+    reason: 'insufficient-funds'
+    currentCoins: number
+    needed: number
+  } | {
+    type: 'success'
+    reason: 'success'
+    next: TowerUpgradeStats
+    cost: number
+    remainingCoins: number
+  }
+
 export interface ActiveSlow {
   slowFactor: number
   slowUntil: number
@@ -189,4 +218,47 @@ export function computeTowerUpgrade(tower: TowerUpgradeStats): TowerUpgradeStats
     fireRateMs: Math.round(tower.fireRateMs * 0.9),
     upgradeCost: Math.round(tower.upgradeCost * 1.5),
   }
+}
+
+export function createTowerUpgradePreview(tower: TowerUpgradeStats): TowerUpgradePreview {
+  const next = computeTowerUpgrade(tower)
+  const preview: TowerUpgradePreview = {
+    next,
+    delta: {
+      damage: next.damage - tower.damage,
+      range: next.range - tower.range,
+      fireRateMs: next.fireRateMs - tower.fireRateMs,
+    },
+    cost: tower.upgradeCost,
+    summary: `+${next.damage - tower.damage} Damage · +${next.range - tower.range} Range · ${next.fireRateMs - tower.fireRateMs}ms fire rate`,
+  }
+  return preview
+}
+
+export function resolveTowerUpgradeRequest(
+  selected: TowerUpgradeStats | null,
+  currentCoins: number,
+): TowerUpgradeRequestOutcome {
+  if (!selected) {
+    return { type: 'no-selection', reason: 'no-selection' }
+  }
+
+  const next = computeTowerUpgrade(selected)
+  const cost = selected.upgradeCost
+
+  if (currentCoins < cost) {
+    return { type: 'insufficient-funds', reason: 'insufficient-funds', currentCoins, needed: cost }
+  }
+
+  return {
+    type: 'success',
+    reason: 'success',
+    next,
+    cost,
+    remainingCoins: Math.max(0, currentCoins - cost),
+  }
+}
+
+export function formatTowerUpgradePreview(preview: Pick<TowerUpgradePreview, 'summary'>): string {
+  return preview.summary
 }
