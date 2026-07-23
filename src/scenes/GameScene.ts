@@ -7,12 +7,22 @@ import {
   createOnboardingState,
   getOnboardingInstruction,
   type OnboardingStep,
-  type OnboardingTransition,
   type OnboardingState,
+  type OnboardingTransition,
 } from '../systems/onboardingRules'
-import { finishRun, createRunState, isRunActive, type RunState } from '../systems/runState'
+import { createRunState, finishRun, isRunActive, type RunState } from '../systems/runState'
+import {
+  buildRunResult,
+  createRunResultTracker,
+  recordKill,
+  recordLeak,
+  type RunResultSnapshot,
+  type RunResultTracker,
+} from '../systems/runResultRules'
 import { createBattleBackground, createHeader, drawPath } from '../systems/gameBoard'
 import { playFanfareSfx } from '../systems/audioManager'
+import { createEmptyProfile, applyRunResultToProfile, type ProfileRecord } from '../systems/profilePersistenceRules'
+import { loadProfile, markOnboardingComplete, updateProfile } from '../systems/profileStore'
 import TowerPlacementSystem, { type TowerPlacementSnapshot } from '../systems/TowerPlacementSystem'
 import CombatSystem from '../systems/CombatSystem'
 import {
@@ -38,34 +48,48 @@ export interface HudState {
   onboardingStep: OnboardingStep
   onboardingInstruction: string
   waveLabel: string
+  result: RunResultSnapshot | null
+  profile: ProfileRecord
 }
 
 export default class GameScene extends Phaser.Scene {
   private static onboardingCompletedInSession = false
-  private coins: number = CONFIG.run.startingCoins
+  private static nextRunId = 0
+
+  private coins = CONFIG.run.startingCoins
   private lives: number = CONFIG.run.startingLives
   private placementMessage: TimedHudMessage | undefined
   private combatMessage: TimedHudMessage | undefined
-
   private runState: RunState = createRunState()
   private placement!: TowerPlacementSystem
   private combat!: CombatSystem
   private onboardingState: OnboardingState = createOnboardingState(0, CONFIG.ui.onboarding, GameScene.onboardingCompletedInSession)
   private hasPlacedFirstTower = false
+  private runResultTracker: RunResultTracker = createRunResultTracker(0)
+  private result: RunResultSnapshot | null = null
+  private profile: ProfileRecord = createEmptyProfile()
+  private profileLoadEpoch = 0
+  private persistedOnboarding = false
+  private hasPlayedFanfare = false
 
   constructor() {
     super('GameScene')
   }
 
   create(): void {
+    const sessionId = ++GameScene.nextRunId
+
     this.runState = createRunState(this.time.now)
     this.hasPlacedFirstTower = false
     this.onboardingState = createOnboardingState(this.time.now, CONFIG.ui.onboarding, GameScene.onboardingCompletedInSession)
-
+    this.combatMessage = undefined
+    this.placementMessage = undefined
     this.coins = CONFIG.run.startingCoins
     this.lives = CONFIG.run.startingLives
-    this.placementMessage = undefined
-    this.combatMessage = undefined
+    this.result = null
+    this.hasPlayedFanfare = false
+    this.runResultTracker = createRunResultTracker(this.time.now)
+    this.profileLoadEpoch = sessionId
 
     this.cameras.main.setBackgroundColor(CONFIG.world.backgroundColor)
     createBattleBackground(this)
@@ -83,6 +107,12 @@ export default class GameScene extends Phaser.Scene {
       },
       onStatusUpdate: (status) => {
         this.combatMessage = createTimedHudMessage(status, this.time.now, CONFIG.ui.status.combatMessageMs)
+      },
+      onEnemyLeaked: () => {
+        this.runResultTracker = recordLeak(this.runResultTracker)
+      },
+      onEnemyKilled: () => {
+        this.runResultTracker = recordKill(this.runResultTracker)
       },
     })
 
@@ -110,7 +140,12 @@ export default class GameScene extends Phaser.Scene {
       onTowerUpgraded: () => {
         this.handleOnboardingEvent('tower-upgraded')
       },
+      onTowerSold: (amount) => {
+        this.coins += amount
+      },
     })
+
+    this.bootstrapProfile(sessionId)
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.placement.destroy()
@@ -119,11 +154,23 @@ export default class GameScene extends Phaser.Scene {
     this.scene.launch('UIScene')
   }
 
+  private bootstrapProfile(sessionId: number): void {
+    void (async () => {
+      const loaded = await loadProfile()
+      if (sessionId !== this.profileLoadEpoch) return
+
+      this.profile = loaded
+      if (this.profile.onboardingCompleted) {
+        GameScene.onboardingCompletedInSession = true
+        this.onboardingState = createOnboardingState(this.time.now, CONFIG.ui.onboarding, true)
+      }
+    })()
+  }
+
   update(_time: number, delta: number): void {
     if (!isRunActive(this.runState)) return
 
     this.onboardingState = this.applyOnboardingTransition(applyObjectiveAutoAdvance(this.onboardingState, this.time.now))
-
     this.combat.update(delta, this.placement.getTowers())
     this.checkWinState()
   }
@@ -151,11 +198,17 @@ export default class GameScene extends Phaser.Scene {
       waveLabel: formatWaveHud(waveProgress, this.combat.activeEnemyCount),
       onboardingStep: this.onboardingState.step,
       onboardingInstruction: stepInstruction,
+      result: this.result,
+      profile: this.profile,
     }
   }
 
   upgradeSelectedTower(): boolean {
     return this.placement.upgradeSelectedTower()
+  }
+
+  sellSelectedTower(): boolean {
+    return this.placement.sellSelectedTower()
   }
 
   skipOnboarding(): void {
@@ -166,7 +219,12 @@ export default class GameScene extends Phaser.Scene {
 
   private applyOnboardingTransition(transition: OnboardingTransition): OnboardingState {
     if (!transition.didTransition) return transition.state
-    if (transition.state.step === 'complete') GameScene.onboardingCompletedInSession = true
+
+    if (transition.state.step === 'complete') {
+      GameScene.onboardingCompletedInSession = true
+      this.persistOnboardingComplete()
+    }
+
     return transition.state
   }
 
@@ -179,7 +237,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private checkWinState(): void {
-    if (this.combat.isWaveRunComplete && this.combat.activeEnemyCount === 0) this.finishRun(true)
+    if (this.combat.isWaveRunComplete && this.combat.activeEnemyCount === 0) {
+      this.finishRun(true)
+    }
   }
 
   private finishRun(didWin: boolean): void {
@@ -187,22 +247,44 @@ export default class GameScene extends Phaser.Scene {
     this.runState = state
     if (!didTransition) return
 
+    this.profileLoadEpoch += 1
+
+    this.result = buildRunResult(
+      this.runResultTracker,
+      this.time.now,
+      didWin ? 'victory' : 'defeat',
+      this.combat.getWaveProgress(),
+      this.lives,
+      this.coins,
+    )
+
+    this.persistRunResult()
+
     this.placement.destroy()
     this.placementMessage = undefined
     this.combatMessage = undefined
 
-    const statusText = didWin ? 'Victory!' : 'Defeat!'
+    if (didWin && !this.hasPlayedFanfare) {
+      playFanfareSfx()
+      this.hasPlayedFanfare = true
+    }
+  }
 
-    this.add.rectangle(400, 240, 430, 130, 0x101610, 0.9).setStrokeStyle(2, CONFIG.world.accentColor)
-    this.add
-      .text(400, 214, statusText, { fontSize: '34px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
-      .setOrigin(0.5)
-    this.add
-      .text(400, 258, 'Tap to restart Rabbit Defense', { fontSize: '16px', color: '#c8d8b6' })
-      .setOrigin(0.5)
+  private async persistOnboardingComplete(): Promise<void> {
+    if (this.persistedOnboarding) return
+    this.persistedOnboarding = true
+    this.profile = await markOnboardingComplete()
+  }
 
-    this.input.once('pointerdown', () => this.scene.restart())
-
-    if (didWin) playFanfareSfx()
+  private async persistRunResult(): Promise<void> {
+    if (!this.result) return
+    try {
+      const persisted = await updateProfile((previous: ProfileRecord) => {
+        return applyRunResultToProfile(previous, this.result!)
+      })
+      this.profile = persisted
+    } catch {
+      // Non-blocking: gameplay should continue even if storage is unavailable.
+    }
   }
 }

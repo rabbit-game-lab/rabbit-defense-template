@@ -41,12 +41,29 @@ import {
 } from '../.tmp-tests/src/systems/hudRules.js'
 
 import {
+  createRunResultTracker,
+  deriveWaveStats,
+  recordKill,
+  recordLeak,
+  buildRunResult,
+} from '../.tmp-tests/src/systems/runResultRules.js'
+
+import {
   applyOnboardingEvent,
   applyOnboardingPlayerAction,
   applyObjectiveAutoAdvance,
   createOnboardingState,
   getOnboardingInstruction,
 } from '../.tmp-tests/src/systems/onboardingRules.js'
+
+import {
+  applyRunResultToProfile,
+  createEmptyProfile,
+  deserializeProfile,
+  serializeProfile,
+} from '../.tmp-tests/src/systems/profilePersistenceRules.js'
+
+import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -433,4 +450,91 @@ const repeated = finishRun(victory.state, 'defeat', 900)
 assert.equal(repeated.didTransition, false, 'terminal transition is idempotent')
 assert.equal(repeated.state, victory.state, 'repeated finish preserves the original object and outcome')
 
-console.log('towerDefenseRules, waveRules, onboardingRules, hudRules, and runState tests passed')
+// runResultRules
+const tracker = createRunResultTracker(100)
+assert.deepEqual(
+  deriveWaveStats({ wave: 0, phase: 'preparing', toSpawnInCurrentWave: 1, totalWaves: 3, activeEnemies: 0 }),
+  {
+    wavesReached: 0,
+    wavesCleared: 0,
+  },
+  'run result tracks zero while preparing',
+)
+let tracked = recordKill(tracker, 3)
+tracked = recordLeak(tracked, 2)
+tracked = recordKill(tracked, 3)
+tracked = recordLeak(tracked)
+const runResult = buildRunResult(tracked, 2400, 'victory', { wave: 2, phase: 'active', toSpawnInCurrentWave: 1, totalWaves: 3, activeEnemies: 0 }, 3, 200)
+assert.deepEqual(runResult, {
+  outcome: 'victory',
+  durationMs: 2300,
+  wavesReached: 2,
+  wavesCleared: 1,
+  kills: 6,
+  leaks: 3,
+  livesRemaining: 3,
+  coinsRemaining: 200,
+})
+
+// profilePersistenceRules
+assert.deepEqual(createEmptyProfile(), {
+  schemaVersion: 1,
+  onboardingCompleted: false,
+  wins: 0,
+  defeats: 0,
+  bestLives: 0,
+  bestCoins: 0,
+  fastestWinMs: 0,
+})
+assert.deepEqual(deserializeProfile(null), createEmptyProfile())
+assert.deepEqual(deserializeProfile('bad'), createEmptyProfile())
+const compact = {
+  v: 0,
+  o: 1,
+  w: 5,
+  d: 2,
+  l: 3,
+  c: 4,
+  f: 900,
+}
+const profileFromCompact = deserializeProfile(JSON.stringify(compact))
+assert.equal(profileFromCompact.onboardingCompleted, true)
+assert.equal(profileFromCompact.wins, 5)
+assert.equal(profileFromCompact.bestLives, 3)
+assert.equal(profileFromCompact.fastestWinMs, 900)
+const serialized = serializeProfile(profileFromCompact)
+assert.deepEqual(deserializeProfile(serialized), profileFromCompact)
+
+const baseline = createEmptyProfile()
+const profileAfterWin = applyRunResultToProfile(baseline, {
+  outcome: 'victory',
+  wavesCleared: 1,
+  wavesReached: 1,
+  kills: 2,
+  leaks: 1,
+  livesRemaining: 6,
+  coinsRemaining: 50,
+  durationMs: 320,
+})
+const profileAfterLoss = applyRunResultToProfile(profileAfterWin, {
+  outcome: 'defeat',
+  wavesCleared: 3,
+  wavesReached: 4,
+  kills: 3,
+  leaks: 4,
+  livesRemaining: 0,
+  coinsRemaining: 0,
+  durationMs: 700,
+})
+assert.equal(profileAfterWin.wins, 1)
+assert.equal(profileAfterWin.defeats, 0)
+assert.equal(profileAfterWin.bestLives, 6)
+assert.equal(profileAfterWin.bestCoins, 50)
+assert.equal(profileAfterWin.fastestWinMs, 320)
+assert.equal(profileAfterLoss.defeats, 1)
+
+// towerEconomyRules
+assert.equal(refundForTowerEconomy({ cost: 40, level: 1, upgradeCost: 25, investedCost: 150 }, 0.6), 90)
+assert.equal(refundForTowerEconomy({ cost: 40, level: 2, upgradeCost: 25 }, 0.5), 32)
+
+console.log('towerDefenseRules, waveRules, runResultRules, profilePersistenceRules, towerEconomyRules, onboardingRules, hudRules, and runState tests passed')
