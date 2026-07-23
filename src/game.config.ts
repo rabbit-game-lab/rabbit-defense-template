@@ -94,6 +94,27 @@ export const CONFIG = {
     // Related: wave spawn timings.
     // Units: milliseconds.
     waveStartDelayMs: 1600,
+
+  },
+
+  waves: {
+    // waves.betweenWaveDelayMs
+    // What: pause duration between the last spawn of wave N and first spawn of wave N+1.
+    // Feel: longer pauses reduce pressure and support planning.
+    // Range: 800-5000 (default 2600).
+    // Related: build pad availability and player upgrading cadence.
+    // Units: milliseconds.
+    betweenWaveDelayMs: 2600,
+  },
+
+  combat: {
+    // combat.projectileHitRadiusPx
+    // What: impact radius used to determine if a projectile collides with a target.
+    // Feel: bigger feels less precise but more forgiving.
+    // Range: 6-24 (default 12).
+    // Related: tower projectile visuals and enemy speed.
+    // Units: pixels.
+    projectileHitRadiusPx: 12,
   },
 
   ui: {

@@ -14,7 +14,8 @@ export interface EnemyRuntime {
   leakDamage: number
   pathIndex: number
   progress: number
-  slowedUntil: number
+  slowFactor: number
+  slowUntil: number
   escaped: boolean
   view: EnemyView
 }

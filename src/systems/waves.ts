@@ -1,43 +1,35 @@
+import { CONFIG } from '../game.config'
 import { ENEMIES, type EnemyType, WAVES } from '../data/towerDefense'
+import {
+  createWaveState as createPureWaveState,
+  isWaveRunComplete,
+  markWaveEnemySpawned,
+  nextWaveEnemy,
+  scaleEnemyStats,
+  type WaveSpawnState,
+} from './waveRules'
 
-export interface WaveSpawnState {
-  waveIndex: number
-  nextEnemyIndex: number
-  nextSpawnAt: number
-  betweenWaveUntil: number
-}
+export type { WaveSpawnState } from './waveRules'
 
-export function createWaveState(startAt: number): WaveSpawnState {
-  return { waveIndex: 0, nextEnemyIndex: 0, nextSpawnAt: startAt, betweenWaveUntil: 0 }
+export function createWaveState(
+  startAt: number,
+  betweenWaveMs = CONFIG.waves.betweenWaveDelayMs,
+): WaveSpawnState {
+  return createPureWaveState(startAt, betweenWaveMs)
 }
 
 export function isFinalWaveComplete(state: WaveSpawnState): boolean {
-  return state.waveIndex >= WAVES.length
+  return isWaveRunComplete(state, WAVES.length)
 }
 
 export function nextEnemyToSpawn(state: WaveSpawnState, now: number): EnemyType | undefined {
-  if (isFinalWaveComplete(state) || now < state.nextSpawnAt || now < state.betweenWaveUntil) return undefined
-  return WAVES[state.waveIndex]?.enemies[state.nextEnemyIndex]
+  return nextWaveEnemy(state, now, WAVES)
 }
 
 export function markEnemySpawned(state: WaveSpawnState, now: number): void {
-  const wave = WAVES[state.waveIndex]
-  state.nextEnemyIndex += 1
-  state.nextSpawnAt = now + wave.spawnEveryMs
-  if (state.nextEnemyIndex >= wave.enemies.length) {
-    state.waveIndex += 1
-    state.nextEnemyIndex = 0
-    state.betweenWaveUntil = now + 2600
-    state.nextSpawnAt = state.betweenWaveUntil
-  }
+  markWaveEnemySpawned(state, now, WAVES)
 }
 
 export function makeEnemyStats(type: EnemyType, waveIndex: number) {
-  const base = ENEMIES[type]
-  const scale = 1 + waveIndex * 0.18
-  return {
-    ...base,
-    hp: Math.round(base.hp * scale),
-    reward: base.reward + Math.floor(waveIndex * 2),
-  }
+  return scaleEnemyStats(ENEMIES[type], waveIndex)
 }
