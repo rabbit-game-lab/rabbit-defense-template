@@ -64,12 +64,44 @@ import {
 } from '../.tmp-tests/src/systems/profilePersistenceRules.js'
 
 import { refundForTower as refundForTowerEconomy } from '../.tmp-tests/src/systems/towerEconomyRules.js'
+import {
+  createBaselineStrategies,
+  simulateStrategy,
+} from '../.tmp-tests/src/systems/balanceSimulator.js'
+import { WAVES as balanceWaves } from '../.tmp-tests/src/data/towerDefense.js'
 
 const path = [
   { x: 0, y: 0 },
   { x: 100, y: 0 },
   { x: 100, y: 100 },
 ]
+
+const balanceStrategies = createBaselineStrategies()
+assert.deepEqual(
+  balanceStrategies.map((strategy) => strategy.id),
+  ['arrow-frost', 'arrow-bomb', 'arrow-focused', 'balanced-three'],
+)
+const balanceEnemyCount = balanceWaves.reduce((sum, wave) => sum + wave.enemies.length, 0)
+for (const strategy of balanceStrategies) {
+  const first = simulateStrategy(strategy)
+  const second = simulateStrategy(strategy)
+  assert.deepEqual(second, first, `${strategy.id} simulation must be deterministic`)
+  assert.equal(first.waveSnapshots.length, balanceWaves.length)
+  assert.ok(first.finalCoins >= 0)
+  assert.ok(first.finalLives >= 0)
+  assert.ok(first.totalKills + first.totalLeaks <= balanceEnemyCount)
+  assert.ok(first.finalTowers.length <= 6)
+  for (const tower of first.finalTowers) {
+    assert.ok(tower.level >= 1)
+    assert.ok(tower.level <= tower.maxLevel)
+  }
+  for (const wave of first.waveSnapshots) {
+    assert.ok(wave.coinsAtStart >= 0 && wave.coinsAtEnd >= 0)
+    assert.ok(wave.livesAtStart >= 0 && wave.livesAtEnd >= 0)
+    assert.ok(wave.kills >= 0 && wave.leaks >= 0)
+    assert.ok(wave.purchases.every((purchase) => purchase.wave === wave.wave && purchase.cost >= 0))
+  }
+}
 
 assert.equal(canAffordTower(100, { cost: 75 }), true)
 assert.equal(canAffordTower(50, { cost: 75 }), false)

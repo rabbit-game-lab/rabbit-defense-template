@@ -11,6 +11,7 @@
     "dev": "vite --host",
     "build": "tsc && vite build",
     "check": "node scripts/check.mjs",
+    "simulate:balance": "node scripts/simulate-balance.mjs",
     "test:rules": "rm -rf .tmp-tests && tsc --noEmit false --outDir .tmp-tests && node scripts/test-rules.mjs",
     "preview": "vite preview"
   },

@@ -1,0 +1,31 @@
+# Balance Baseline Report (Deterministic 20ms simulation)
+
+- Simulator assumptions: deterministic wave/state progression, fixed 20ms tick, no randomness, no API/input dependence.
+- The model reuses real tower/enemy/wave definitions and pure combat rules, but remains comparative rather than a pixel-perfect Phaser replay.
+- Action policy: baseline strategies only (place/upgrade), one action per tick, sorted stable targets, max three upgrade levels.
+- Decision: all four legal baselines clear the five introductory waves with 15 lives, so PR #5 makes no gameplay tuning change; harder expansion is evaluated separately.
+
+- Arrow + Frost: VICTORY | coins 195 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 6
+  - Wave 1: buys 2, kills 4, leaks 0, Δcoins -61, Δlives 0
+  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -15, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 8, Δlives 0
+  - Wave 4: buys 0, kills 6, leaks 0, Δcoins 67, Δlives 0
+  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 116, Δlives 0
+- Arrow + Bombard: VICTORY | coins 170 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 6
+  - Wave 1: buys 1, kills 4, leaks 0, Δcoins 9, Δlives 0
+  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -55, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 8, Δlives 0
+  - Wave 4: buys 1, kills 6, leaks 0, Δcoins 27, Δlives 0
+  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 101, Δlives 0
+- Arrow upgrades: VICTORY | coins 110 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 8
+  - Wave 1: buys 2, kills 4, leaks 0, Δcoins -41, Δlives 0
+  - Wave 2: buys 1, kills 5, leaks 0, Δcoins -10, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins 23, Δlives 0
+  - Wave 4: buys 2, kills 6, leaks 0, Δcoins -43, Δlives 0
+  - Wave 5: buys 2, kills 7, leaks 0, Δcoins 101, Δlives 0
+- Balanced: VICTORY | coins 45 | lives 15 | kills 27 | leaks 0 | waves 5/5 | purchases 8
+  - Wave 1: buys 2, kills 4, leaks 0, Δcoins -61, Δlives 0
+  - Wave 2: buys 0, kills 5, leaks 0, Δcoins 40, Δlives 0
+  - Wave 3: buys 1, kills 5, leaks 0, Δcoins -47, Δlives 0
+  - Wave 4: buys 1, kills 6, leaks 0, Δcoins 1, Δlives 0
+  - Wave 5: buys 4, kills 7, leaks 0, Δcoins 32, Δlives 0
