@@ -195,6 +195,7 @@ export default class GameScene extends Phaser.Scene {
     if (!isRunActive(this.runState)) return
 
     this.onboardingState = this.applyOnboardingTransition(applyObjectiveAutoAdvance(this.onboardingState, this.time.now))
+    this.placement.refreshShopAffordability(this.coins)
     this.combat.update(delta, this.placement.getTowers(), this.gameSpeed)
     const wave = this.combat.getWaveProgress()
     if (wave.phase === 'active' && wave.wave !== this.lastAnnouncedWave) {

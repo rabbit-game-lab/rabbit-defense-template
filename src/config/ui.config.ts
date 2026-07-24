@@ -166,19 +166,47 @@ export const uiConfig = {
     bottomY: 442,
     bottomWidth: 784,
     bottomHeight: 72,
-    selectedTextX: 28,
-    statusTextX: 212,
+    /**
+     * What: The bottom HUD is a two-column layout — a stacked text column on the
+     *       left, the action buttons on the right.
+     * Feel: Text never runs under a button; anything too long is ellipsised at
+     *       textZoneRightX rather than overlapping.
+     * Range: textZoneRightX must stay <= the leftmost button edge
+     *        (targetButtonX - targetButtonWidth / 2) minus a small gutter.
+     * Related: actionButtonY and the three *ButtonX entries below.
+     * Units: px (logical pixels).
+     */
+    textLeftX: 28,
+    textZoneRightX: 400,
     selectedFontSize: '13px',
     statusFontSize: '12px',
     previewFontSize: '11px',
-    upgradeButtonWidth: 140,
-    upgradeButtonHeight: 56,
+    hintFontSize: '10px',
+    // Four stacked rows, measured down from the top of the bottom panel.
+    selectedLineY: 5,
+    statusLineY: 22,
+    previewLineY: 39,
+    hintLineY: 55,
+    /**
+     * What: The action button row, right-aligned in the bottom panel.
+     * Feel: Thumb-reachable and never overlapping the text column.
+     * Range: each width >= buttonDefaults.minTouchablePx.
+     * Related: textZoneRightX above, which must clear targetButtonX.
+     * Units: px (logical pixels); *X values are centres.
+     */
+    actionButtonY: 442,
+    targetButtonX: 466,
+    targetButtonWidth: 116,
+    sellButtonX: 588,
+    sellButtonWidth: 104,
     upgradeButtonX: 708,
-    upgradeButtonY: 442,
+    upgradeButtonWidth: 128,
+    upgradeButtonHeight: 56,
     upgradeButtonFontSize: '13px',
-    selectedLineY: 7,
-    statusLineY: 29,
-    previewLineY: 49,
+    /** Top HUD: the raid line must stop before the speed button. */
+    waveTextX: 250,
+    waveZoneRightX: 464,
+    speedButtonX: 500,
     infoTextColor: '#c8d8b6',
     maxLevelText: 'MAX',
   },

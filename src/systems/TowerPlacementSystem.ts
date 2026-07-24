@@ -87,6 +87,18 @@ export default class TowerPlacementSystem {
     return this.towers
   }
 
+  /**
+   * Keeps the shop cards honest about what the player can currently buy. Without
+   * this an unaffordable card looks identical to an affordable one, and placement
+   * silently fails at the drop with only a transient status line to explain it.
+   */
+  refreshShopAffordability(coins: number): void {
+    for (const card of this.shopCards) {
+      const cost = TOWERS[card.type].cost
+      card.setAffordable(coins >= cost, Math.max(0, cost - coins))
+    }
+  }
+
   getSnapshot(currentCoins = 0): TowerPlacementSnapshot {
     const selected = this.towers.find((tower) => tower.id === this.selectedTowerId)
     return {

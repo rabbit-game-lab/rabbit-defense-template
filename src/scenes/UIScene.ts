@@ -5,6 +5,7 @@ import { PauseMenuController, type PauseOverlayMarker } from '../ui/PauseMenuCon
 import { ResultPanelController } from '../ui/ResultPanelController'
 import { createPortraitOrientationGate } from '../ui/createPortraitOrientationGate'
 import { GameplayFocusController, type GameSceneBridge } from '../ui/GameplayFocusController'
+import { createTextFitter } from '../ui/fitText'
 import { GAME_SCENE_KEY, MAIN_MENU_SCENE_KEY } from './flowContracts'
 import type { HudState } from './GameScene'
 import { isReducedEffectsEnabled } from '../systems/accessibilitySettingsStore'
@@ -35,6 +36,11 @@ export default class UIScene extends Phaser.Scene {
   private previousCoins?: number
   private previousLives?: number
   private changeHideAt = 0
+  private fitSelected!: (raw: string) => void
+  private fitStatus!: (raw: string) => void
+  private fitPreview!: (raw: string) => void
+  private fitHint!: (raw: string) => void
+  private fitWave!: (raw: string) => void
 
   constructor() {
     super('UIScene')
@@ -107,7 +113,7 @@ export default class UIScene extends Phaser.Scene {
     this.renderTopHud(hud)
     this.renderSelection(hud)
     this.renderOnboarding(hud)
-    this.renderKeyboardHint(hud)
+    this.renderKeyboardHint()
     this.resultPanel.render(hud)
   }
 
@@ -117,23 +123,32 @@ export default class UIScene extends Phaser.Scene {
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.45)
     this.statsLine = this.add.text(18, hud.topRowY + 8, '', { fontSize: '16px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
     this.changeLine = this.add.text(18, hud.topRowY + 32, '', { fontSize: '12px', color: CONFIG.ui.colors.positive, fontStyle: 'bold' })
-    this.waveLine = this.add.text(250, hud.topRowY + 9, '', { fontSize: '15px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
+    this.waveLine = this.add.text(hud.waveTextX, hud.topRowY + 9, '', { fontSize: '15px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
     const bottomTop = hud.bottomY - hud.bottomHeight / 2
     this.add.rectangle(CONFIG.screen.width / 2, hud.bottomY, hud.bottomWidth, hud.bottomHeight, CONFIG.ui.panelColor, 0.94)
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.4)
-    this.selectedLine = this.add.text(hud.selectedTextX, bottomTop + hud.selectedLineY, '', { fontSize: hud.selectedFontSize, color: CONFIG.ui.colors.accentText, fontStyle: 'bold' })
-    this.statusLine = this.add.text(hud.statusTextX, bottomTop + hud.statusLineY, '', { fontSize: hud.statusFontSize, color: CONFIG.ui.textColor })
-    this.previewLine = this.add.text(hud.statusTextX, bottomTop + hud.previewLineY, '', { fontSize: hud.previewFontSize, color: CONFIG.ui.colors.accentText })
-    this.keyboardHintLine = this.add.text(18, bottomTop + 49, '', { fontSize: '10px', color: CONFIG.ui.colors.hint, fontStyle: 'bold' }).setVisible(false)
+    // One left-hand column: every row starts at textLeftX and stops at textZoneRightX,
+    // which is what keeps these clear of the action buttons.
+    this.selectedLine = this.add.text(hud.textLeftX, bottomTop + hud.selectedLineY, '', { fontSize: hud.selectedFontSize, color: CONFIG.ui.colors.accentText, fontStyle: 'bold' })
+    this.statusLine = this.add.text(hud.textLeftX, bottomTop + hud.statusLineY, '', { fontSize: hud.statusFontSize, color: CONFIG.ui.textColor })
+    this.previewLine = this.add.text(hud.textLeftX, bottomTop + hud.previewLineY, '', { fontSize: hud.previewFontSize, color: CONFIG.ui.colors.accentText })
+    this.keyboardHintLine = this.add.text(hud.textLeftX, bottomTop + hud.hintLineY, '', { fontSize: hud.hintFontSize, color: CONFIG.ui.colors.hint, fontStyle: 'bold' }).setVisible(false)
+
+    const zone = hud.textZoneRightX - hud.textLeftX
+    this.fitSelected = createTextFitter(this.selectedLine, zone)
+    this.fitStatus = createTextFitter(this.statusLine, zone)
+    this.fitPreview = createTextFitter(this.previewLine, zone)
+    this.fitHint = createTextFitter(this.keyboardHintLine, zone)
+    this.fitWave = createTextFitter(this.waveLine, hud.waveZoneRightX - hud.waveTextX)
   }
 
   private createActions(): void {
     const hud = CONFIG.ui.hud
-    const y = hud.upgradeButtonY
-    this.targetButton = createSceneButton(this, { x: 466, y, width: 116, text: 'Target: First', onActivate: () => this.getGameScene()?.cycleSelectedTowerTargetMode() })
-    this.sellButton = createSceneButton(this, { x: 588, y, width: 104, text: 'Sell', onActivate: () => this.handleSell() })
-    this.upgradeButton = createSceneButton(this, { x: hud.upgradeButtonX, y, width: 128, text: 'Upgrade', onActivate: () => this.getGameScene()?.upgradeSelectedTower() })
-    this.speedButton = createSceneButton(this, { x: 500, y: CONFIG.ui.pauseMenu.buttonY, width: CONFIG.ui.pauseMenu.buttonSize, height: CONFIG.ui.pauseMenu.buttonSize, text: '1×', depth: CONFIG.ui.pauseMenu.depth - 1, onActivate: () => this.getGameScene()?.toggleGameSpeed() })
+    const y = hud.actionButtonY
+    this.targetButton = createSceneButton(this, { x: hud.targetButtonX, y, width: hud.targetButtonWidth, text: 'Target: First', onActivate: () => this.getGameScene()?.cycleSelectedTowerTargetMode() })
+    this.sellButton = createSceneButton(this, { x: hud.sellButtonX, y, width: hud.sellButtonWidth, text: 'Sell', onActivate: () => this.handleSell() })
+    this.upgradeButton = createSceneButton(this, { x: hud.upgradeButtonX, y, width: hud.upgradeButtonWidth, text: 'Upgrade', onActivate: () => this.getGameScene()?.upgradeSelectedTower() })
+    this.speedButton = createSceneButton(this, { x: hud.speedButtonX, y: CONFIG.ui.pauseMenu.buttonY, width: CONFIG.ui.pauseMenu.buttonSize, height: CONFIG.ui.pauseMenu.buttonSize, text: '1×', depth: CONFIG.ui.pauseMenu.depth - 1, onActivate: () => this.getGameScene()?.toggleGameSpeed() })
   }
 
   private createOnboarding(): void {
@@ -155,11 +170,11 @@ export default class UIScene extends Phaser.Scene {
     this.speedButton.setText(`${hud.gameSpeed}×`)
     const seconds = Math.max(0, Math.ceil(hud.nextWaveInMs / 1000))
     const bossWarning = hud.wave === hud.totalWaves && hud.wavePhase !== 'active' && hud.wavePhase !== 'complete'
-    const detail = hud.wavePhase === 'preparing' && hud.nextWaveInMs <= 0 ? 'Place a defense'
+    const detail = hud.wavePhase === 'preparing' && hud.nextWaveInMs <= 0 ? 'Build now'
       : hud.wavePhase === 'active' ? `${hud.enemiesToSpawn + hud.activeEnemies} left`
-        : hud.wavePhase === 'complete' ? 'All clear' : `Starts in ${seconds}s`
-    this.waveLine.setText(bossWarning ? `Raid ${hud.wave}/${hud.totalWaves} · BOSS IN ${seconds}` : `Raid ${hud.wave}/${hud.totalWaves} · ${detail}`)
-      .setColor(bossWarning ? CONFIG.ui.colors.danger : CONFIG.ui.textColor)
+        : hud.wavePhase === 'complete' ? 'All clear' : `Next in ${seconds}s`
+    this.fitWave(bossWarning ? `Raid ${hud.wave}/${hud.totalWaves} · BOSS IN ${seconds}` : `Raid ${hud.wave}/${hud.totalWaves} · ${detail}`)
+    this.waveLine.setColor(bossWarning ? CONFIG.ui.colors.danger : CONFIG.ui.textColor)
     const coinDelta = this.previousCoins === undefined ? 0 : hud.coins - this.previousCoins
     const hpDelta = this.previousLives === undefined ? 0 : hud.lives - this.previousLives
     if ((coinDelta || hpDelta) && !isReducedEffectsEnabled()) {
@@ -177,10 +192,10 @@ export default class UIScene extends Phaser.Scene {
       this.sellConfirmationTowerId = ''
       this.lastSelectedTowerId = tower?.id ?? ''
     }
-    this.statusLine.setText(hud.status)
+    this.fitStatus(hud.status)
     if (!tower) {
-      this.selectedLine.setText(`Defenses ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
-      this.previewLine.setText(
+      this.fitSelected(`Defenses ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
+      this.fitPreview(
         hud.placement.pendingTowerType
           ? 'Choose a grass square; invalid squares explain why.'
           : hud.nextWavePreview || 'Choose a defense card to build.',
@@ -192,9 +207,9 @@ export default class UIScene extends Phaser.Scene {
     }
     this.targetButton.setText(`Target: ${tower.targetModeLabel}`); this.targetButton.setEnabled(true)
     const role = tower.type === 'arrow' ? 'Fast' : tower.type === 'frost' ? 'Slow' : 'Splash'
-    this.selectedLine.setText(`${tower.name} · L${tower.level} · ${role} · ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
+    this.fitSelected(`${tower.name} · L${tower.level} · ${role} · ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
     const shortfall = Math.max(0, tower.upgradeCost - hud.coins)
-    this.previewLine.setText(tower.maxed ? `Maximum level · Sell refund ${tower.sellRefund} Ryo` : tower.affordable ? tower.upgrade.summary : `${tower.upgrade.summary} · Need ${shortfall} more Ryo`)
+    this.fitPreview(tower.maxed ? `Maximum level · Sell refund ${tower.sellRefund} Ryo` : tower.affordable ? tower.upgrade.summary : `${tower.upgrade.summary} · Need ${shortfall} more Ryo`)
     this.upgradeButton.setText(tower.maxed ? 'Max Level' : `Upgrade · ${tower.upgradeCost}`)
     this.upgradeButton.setEnabled(!tower.maxed && tower.affordable)
     const confirming = this.sellConfirmationTowerId === tower.id && this.time.now < this.sellConfirmationUntil
@@ -211,7 +226,7 @@ export default class UIScene extends Phaser.Scene {
     this.skipButton.setVisible(visible)
   }
 
-  private renderKeyboardHint(hud: HudState): void {
+  private renderKeyboardHint(): void {
     if (!this.focus.keyboardHintsVisible || this.modalSources.size > 0) {
       this.keyboardHintLine.setVisible(false)
       return
@@ -220,9 +235,10 @@ export default class UIScene extends Phaser.Scene {
     const hint = region === 'shop' ? 'Shop: 1–3 or [ ] · Enter choose · F speed'
       : region === 'terrain' ? 'Terrain: arrows move · Enter place · Esc cancel'
         : region === 'towers' ? 'Defenses: arrows cycle · Tab actions'
-          : region === 'actions' ? 'Actions: arrows cycle · U upgrade · S sell · T target'
+          : region === 'actions' ? 'Actions: arrows · U upgrade · S sell · T target'
             : 'Pause: Enter · P pause · M mute'
-    this.keyboardHintLine.setText(`${hint} · Tab regions${hud.placement.pendingTowerType ? '' : ''}`).setVisible(true)
+    this.fitHint(`${hint} · Tab regions`)
+    this.keyboardHintLine.setVisible(true)
   }
 
   private handleSell(): void {

@@ -162,6 +162,7 @@ import {
   WAVES as balanceWaves,
 } from '../.tmp-tests/src/data/towerDefense.js'
 import { IMAGES as themeImages } from '../.tmp-tests/src/data/assets.js'
+import { CONFIG } from '../.tmp-tests/src/game.config.js'
 
 const path = [
   { x: 0, y: 0 },
@@ -443,8 +444,8 @@ assert.equal(canAffordTower(50, { cost: 75 }), false)
 assert.equal(spendCoins(100, 75), 25)
 assert.equal(refundForTower({ cost: 80, level: 2, upgradeCost: 50 }), 78)
 assert.equal(distanceBetween({ x: 0, y: 0 }, { x: 3, y: 4 }), 5)
-assert.equal(getRunFallbackStatus(false), 'Choose a defense, then place it on a clear grass square.')
-assert.equal(getRunFallbackStatus(true), 'Defend Hidden Dojo — build or upgrade between raids.')
+assert.equal(getRunFallbackStatus(false), 'Choose a defense, then place it on clear grass.')
+assert.equal(getRunFallbackStatus(true), 'Defend the dojo — build or upgrade between raids.')
 assert.deepEqual(
   advanceEnemyAlongPath({ x: 80, y: 0, pathIndex: 0, progress: 80 }, path, 50),
   { x: 100, y: 30, pathIndex: 1, progress: 30, escaped: false },
@@ -1402,6 +1403,98 @@ const fundsEvaluation = evaluateTerrainPlacement({ ...terrainRequest, coins: 17 
 assert.equal(fundsEvaluation.reason, 'insufficient-funds')
 assert.equal(fundsEvaluation.shortfall, 33)
 assert.equal(placementReasonMessage('insufficient-funds', 33), 'Need 33 more ryo to build this tower.')
+
+// Going broke makes EVERY otherwise-legal square report insufficient-funds, which reads
+// as "placement stopped working" unless the shop card says why. Guards the economy point
+// where starting coins run out: startingCoins buys exactly two of the cheapest tower.
+const cheapestCost = Math.min(...Object.values(balanceTowers).map((tower) => tower.cost))
+const affordableFromStart = Math.floor(CONFIG.run.startingCoins / cheapestCost)
+assert.equal(
+  affordableFromStart >= 2,
+  true,
+  'starting coins must fund at least two towers before the first wave reward',
+)
+const brokeCoins = cheapestCost - 1
+let anySquarePlaceable = false
+for (let x = 0; x < CONFIG.screen.width && !anySquarePlaceable; x += CONFIG.placement.cellSize) {
+  for (let y = 0; y < CONFIG.screen.height; y += CONFIG.placement.cellSize) {
+    const evaluation = evaluateTerrainPlacement({
+      x, y, towerType: 'arrow', towerCost: cheapestCost, coins: brokeCoins,
+      maxTowers: CONFIG.placement.maxTowers, placed: [], onboardingVisible: false,
+    })
+    if (evaluation.valid) { anySquarePlaceable = true; break }
+  }
+}
+assert.equal(
+  anySquarePlaceable,
+  false,
+  'below the cheapest cost the whole board is unplaceable — the shop card must show affordability',
+)
+
+// HUD layout invariants — the bottom panel is a text column beside a button row,
+// and these are the constraints that keep the two from overlapping.
+{
+  const H = CONFIG.ui.hud
+  const lineHeight = (font) => Math.ceil(parseInt(font, 10) * 1.25)
+  const leftmostButtonEdge = H.targetButtonX - H.targetButtonWidth / 2
+  assert.equal(
+    H.textZoneRightX <= leftmostButtonEdge,
+    true,
+    `text zone (${H.textZoneRightX}) must stop before the action buttons (${leftmostButtonEdge})`,
+  )
+  assert.equal(
+    H.waveZoneRightX <= H.speedButtonX - CONFIG.ui.pauseMenu.buttonSize / 2,
+    true,
+    'the raid line must stop before the speed button',
+  )
+
+  // Rows are stacked top to bottom and must not collide or leave the panel.
+  const rows = [
+    ['selected', H.selectedLineY, H.selectedFontSize],
+    ['status', H.statusLineY, H.statusFontSize],
+    ['preview', H.previewLineY, H.previewFontSize],
+    ['hint', H.hintLineY, H.hintFontSize],
+  ]
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    const [name, y, font] = rows[index]
+    const [nextName, nextY] = rows[index + 1]
+    assert.equal(
+      y + lineHeight(font) <= nextY,
+      true,
+      `${name} row (y ${y}, ${font}) must not overlap ${nextName} row (y ${nextY})`,
+    )
+  }
+  const [lastName, lastY, lastFont] = rows[rows.length - 1]
+  assert.equal(
+    lastY + lineHeight(lastFont) <= H.bottomHeight,
+    true,
+    `${lastName} row must stay inside the ${H.bottomHeight}px bottom panel`,
+  )
+
+  // Action buttons sit in a row, in order, without touching each other.
+  const buttons = [
+    ['target', H.targetButtonX, H.targetButtonWidth],
+    ['sell', H.sellButtonX, H.sellButtonWidth],
+    ['upgrade', H.upgradeButtonX, H.upgradeButtonWidth],
+  ]
+  for (const [name, x, width] of buttons) {
+    assert.equal(
+      width >= CONFIG.ui.buttonDefaults.minTouchablePx,
+      true,
+      `${name} button must stay touch-sized`,
+    )
+    assert.equal(x + width / 2 <= 792, true, `${name} button must stay inside the panel`)
+  }
+  for (let index = 0; index < buttons.length - 1; index += 1) {
+    const [name, x, width] = buttons[index]
+    const [nextName, nextX, nextWidth] = buttons[index + 1]
+    assert.equal(
+      x + width / 2 <= nextX - nextWidth / 2,
+      true,
+      `${name} button must not overlap ${nextName} button`,
+    )
+  }
+}
 
 // focusNavigationRules
 // Placement validity deliberately does not affect focusability: rejection feedback

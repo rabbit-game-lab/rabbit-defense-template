@@ -10,6 +10,11 @@ export interface ShopCard {
   width: number
   height: number
   setKeyboardFocus(focused: boolean): void
+  /**
+   * Cards stay tappable when unaffordable so keyboard and touch players still get
+   * the "need N more ryo" explanation instead of a control that silently does nothing.
+   */
+  setAffordable(affordable: boolean, shortfall: number): void
 }
 
 export function createBattleBackground(scene: Phaser.Scene): void {
@@ -89,10 +94,29 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
     card.setInteractive(new Phaser.Geom.Rectangle(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains)
     card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
 
+    // Called every frame, so both inputs are memoised: the shortfall keeps counting
+    // down while a card stays unaffordable.
+    let affordable = true
+    let lastShortfall = 0
+
     return {
       type, x: centerX, y: centerY, width: cardWidth, height: cardHeight,
       setKeyboardFocus: (focused: boolean) => {
         cardBg.setStrokeStyle(focused ? 3 : 1, focused ? 0xffffff : tower.topColor, focused ? 1 : 0.8)
+      },
+      setAffordable: (nextAffordable: boolean, shortfall: number) => {
+        if (nextAffordable === affordable && shortfall === lastShortfall) return
+        affordable = nextAffordable
+        lastShortfall = shortfall
+        cardBg.setFillStyle(
+          nextAffordable ? 0x2f422b : CONFIG.ui.buttonDefaults.disabledFill,
+          nextAffordable ? 0.95 : CONFIG.ui.buttonDefaults.disabledAlpha,
+        )
+        icon.setAlpha(nextAffordable ? 1 : 0.45)
+        nameText.setAlpha(nextAffordable ? 1 : 0.55)
+        costText
+          .setText(nextAffordable ? `${tower.cost} ryo` : `+${shortfall} ryo`)
+          .setColor(nextAffordable ? CONFIG.ui.colors.accentText : CONFIG.ui.colors.danger)
       },
     }
   })
