@@ -43,6 +43,35 @@ export const effectsConfig = {
    * Units: sparks.
    */
   placementSparkCount: 6,
+  /**
+   * What: Death burst geometry and the number of sparks flung on a kill.
+   * Feel: A satisfying pop that confirms the defeat without cluttering the lane.
+   * Range: burst 120–400ms, sparks 0–8.
+   * Related: killSparkCount honors Reduced Effects like every motion cue.
+   * Units: milliseconds and sparks.
+   */
+  killBurstMs: 260,
+  killSparkCount: 5,
+  /**
+   * What: Floating "+ryo" reward text lifetime and how far it rises.
+   * Feel: A brief upward drift that ties the coin gain to the enemy that paid it.
+   * Range: 300–900ms, rise 12–40px.
+   * Related: killBurstMs.
+   * Units: milliseconds and logical pixels.
+   */
+  coinPopMs: 620,
+  coinPopRisePx: 26,
+  /**
+   * What: Camera shake felt when a raider breaches the dojo or the boss arrives.
+   * Feel: A small, quickly-settling jolt — presence, not disorientation.
+   * Range: 120–320ms, intensity 0.002–0.008.
+   * Related: gated by Reduced Effects.
+   * Units: milliseconds and normalized shake amplitude.
+   */
+  leakShakeMs: 200,
+  leakShakeIntensity: 0.006,
+  bossShakeMs: 260,
+  bossShakeIntensity: 0.005,
 } as const
 
 export type EffectsConfig = typeof effectsConfig

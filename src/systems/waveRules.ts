@@ -147,6 +147,32 @@ export function createWaveProgressSnapshot<TEnemy>(
   }
 }
 
+export interface WaveEnemyGroup<TEnemy> {
+  type: TEnemy
+  count: number
+}
+
+/**
+ * Groups a wave's enemy list into ordered {type, count} runs for a compact
+ * "what's coming" preview. First-appearance order is preserved so the label
+ * reads the way the raid actually unfolds. Returns [] for an out-of-range index.
+ */
+export function summarizeWave<TEnemy>(
+  waves: readonly WaveLike<TEnemy>[],
+  waveIndex: number,
+): WaveEnemyGroup<TEnemy>[] {
+  const wave = waves[waveIndex]
+  if (!wave) return []
+
+  const groups: WaveEnemyGroup<TEnemy>[] = []
+  for (const enemy of wave.enemies) {
+    const existing = groups.find((group) => group.type === enemy)
+    if (existing) existing.count += 1
+    else groups.push({ type: enemy, count: 1 })
+  }
+  return groups
+}
+
 export function scaleEnemyStats<TEnemy extends ScalableEnemy>(base: TEnemy, waveIndex: number): TEnemy {
   const scale = 1 + waveIndex * 0.18
   return {

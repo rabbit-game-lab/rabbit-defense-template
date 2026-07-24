@@ -15,6 +15,8 @@ interface GameSceneBridge {
   getHudState(): HudState
   upgradeSelectedTower(): boolean
   sellSelectedTower(): boolean
+  cycleSelectedTowerTargetMode(step?: number): boolean
+  toggleGameSpeed(): number
   skipOnboarding(): void
   setUiBlocked(blocked: boolean): void
   beginPlacement(type: TowerType): boolean
@@ -38,6 +40,8 @@ export default class UIScene extends Phaser.Scene {
   private skipButton!: SceneButtonHandle
   private upgradeButton!: SceneButtonHandle
   private sellButton!: SceneButtonHandle
+  private targetButton!: SceneButtonHandle
+  private speedButton!: SceneButtonHandle
   private pauseButton!: SceneButtonHandle
   private resultPanel!: ResultPanelController
   private pauseMenuController!: PauseMenuController
@@ -131,14 +135,11 @@ export default class UIScene extends Phaser.Scene {
 
   private createActions(): void {
     const hud = CONFIG.ui.hud
-    this.sellButton = createSceneButton(this, {
-      x: hud.upgradeButtonX - 142, y: hud.upgradeButtonY, width: 112, text: 'Sell',
-      onActivate: () => this.handleSell(),
-    })
-    this.upgradeButton = createSceneButton(this, {
-      x: hud.upgradeButtonX, y: hud.upgradeButtonY, width: hud.upgradeButtonWidth, text: 'Upgrade',
-      onActivate: () => this.getGameScene()?.upgradeSelectedTower(),
-    })
+    const y = hud.upgradeButtonY
+    this.targetButton = createSceneButton(this, { x: 466, y, width: 116, text: 'Target: First', onActivate: () => this.getGameScene()?.cycleSelectedTowerTargetMode() })
+    this.sellButton = createSceneButton(this, { x: 588, y, width: 104, text: 'Sell', onActivate: () => this.handleSell() })
+    this.upgradeButton = createSceneButton(this, { x: hud.upgradeButtonX, y, width: 128, text: 'Upgrade', onActivate: () => this.getGameScene()?.upgradeSelectedTower() })
+    this.speedButton = createSceneButton(this, { x: 500, y: CONFIG.ui.pauseMenu.buttonY, width: CONFIG.ui.pauseMenu.buttonSize, height: CONFIG.ui.pauseMenu.buttonSize, text: '1×', depth: CONFIG.ui.pauseMenu.depth - 1, onActivate: () => this.getGameScene()?.toggleGameSpeed() })
   }
 
   private createOnboarding(): void {
@@ -157,6 +158,7 @@ export default class UIScene extends Phaser.Scene {
 
   private renderTopHud(hud: HudState): void {
     this.statsLine.setText(`Ryo ${hud.coins}   Dojo HP ${hud.lives}`)
+    this.speedButton.setText(`${hud.gameSpeed}×`)
     const seconds = Math.max(0, Math.ceil(hud.nextWaveInMs / 1000))
     const bossWarning = hud.wave === hud.totalWaves && hud.wavePhase !== 'active' && hud.wavePhase !== 'complete'
     const detail = hud.wavePhase === 'preparing' && hud.nextWaveInMs <= 0 ? 'Place a defense'
@@ -184,11 +186,17 @@ export default class UIScene extends Phaser.Scene {
     this.statusLine.setText(hud.status)
     if (!tower) {
       this.selectedLine.setText(`Defenses ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
-      this.previewLine.setText(hud.placement.pendingTowerType ? 'Choose a grass square; invalid squares explain why.' : 'Choose a defense card to build.')
+      this.previewLine.setText(
+        hud.placement.pendingTowerType
+          ? 'Choose a grass square; invalid squares explain why.'
+          : hud.nextWavePreview || 'Choose a defense card to build.',
+      )
       this.upgradeButton.setText('Upgrade'); this.upgradeButton.setEnabled(false)
       this.sellButton.setText('Sell'); this.sellButton.setEnabled(false)
+      this.targetButton.setText('Target'); this.targetButton.setEnabled(false)
       return
     }
+    this.targetButton.setText(`Target: ${tower.targetModeLabel}`); this.targetButton.setEnabled(true)
     const role = tower.type === 'arrow' ? 'Fast' : tower.type === 'frost' ? 'Slow' : 'Splash'
     this.selectedLine.setText(`${tower.name} · L${tower.level} · ${role} · ${hud.placement.towerCount}/${hud.placement.towerMaximum}`)
     const shortfall = Math.max(0, tower.upgradeCost - hud.coins)
@@ -214,10 +222,10 @@ export default class UIScene extends Phaser.Scene {
       this.keyboardHintLine.setVisible(false)
       return
     }
-    const hint = this.activeRegion === 'shop' ? 'Shop: 1–3 or [ ] · Enter choose'
+    const hint = this.activeRegion === 'shop' ? 'Shop: 1–3 or [ ] · Enter choose · F speed'
       : this.activeRegion === 'terrain' ? 'Terrain: arrows move · Enter place · Esc cancel'
         : this.activeRegion === 'towers' ? 'Defenses: arrows cycle · Tab actions'
-          : this.activeRegion === 'actions' ? 'Actions: arrows cycle · U upgrade · S sell'
+          : this.activeRegion === 'actions' ? 'Actions: arrows cycle · U upgrade · S sell · T target'
             : 'Pause: Enter · P pause · M mute'
     this.keyboardHintLine.setText(`${hint} · Tab regions${hud.placement.pendingTowerType ? '' : ''}`).setVisible(true)
   }
@@ -280,10 +288,19 @@ export default class UIScene extends Phaser.Scene {
     }
     if (event.key.toLowerCase() === 'u') { game.upgradeSelectedTower(); return }
     if (event.key.toLowerCase() === 's') { this.handleSell(); return }
+    if (event.key.toLowerCase() === 't') { game.cycleSelectedTowerTargetMode(); return }
+    if (event.key.toLowerCase() === 'f') { game.toggleGameSpeed(); return }
     if (event.key !== 'Enter' && event.key !== ' ') return
     if (this.activeRegion === 'shop') game.beginPlacement(SHOP_TOWER_ORDER[this.shopIndex])
     else if (this.activeRegion === 'terrain') game.confirmPlacementAtCursor()
     else if (this.activeRegion === 'towers') game.selectTower(hud.placement.towerIds[this.towerIndex] ?? '')
+    else if (this.activeRegion === 'actions') this.activateFocusedAction(game)
+  }
+
+  private activateFocusedAction(game: Phaser.Scene & GameSceneBridge): void {
+    if (this.actionIndex === 0) game.upgradeSelectedTower()
+    else if (this.actionIndex === 1) this.handleSell()
+    else game.cycleSelectedTowerTargetMode()
   }
 
   private handleArrow(key: string, hud: HudState): void {
@@ -300,7 +317,7 @@ export default class UIScene extends Phaser.Scene {
       this.towerIndex = (this.towerIndex + step + hud.placement.towerIds.length) % hud.placement.towerIds.length
       game.selectTower(hud.placement.towerIds[this.towerIndex])
     } else if (this.activeRegion === 'actions') {
-      this.actionIndex = this.actionIndex ? 0 : 1
+      this.actionIndex = (this.actionIndex + step + 3) % 3
     }
     this.applyRegionFocus()
   }
@@ -320,6 +337,7 @@ export default class UIScene extends Phaser.Scene {
     this.getGameScene()?.focusShopCard(this.activeRegion === 'shop' ? this.shopIndex : -1)
     this.upgradeButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 0)
     this.sellButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 1)
+    this.targetButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 2)
     this.pauseButton?.setKeyboardFocus(this.activeRegion === 'pause')
   }
 

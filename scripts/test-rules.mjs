@@ -4,6 +4,7 @@ import {
   advanceEnemyAlongPath,
   canAffordTower,
   chooseTowerTarget,
+  cycleTargetMode,
   computeTowerUpgrade,
   createTowerUpgradePreview,
   resolveTowerUpgradeRequest,
@@ -32,6 +33,7 @@ import {
   markWaveEnemySpawned,
   nextWaveEnemy,
   scaleEnemyStats,
+  summarizeWave,
 } from '../.tmp-tests/src/systems/waveRules.js'
 
 import {
@@ -566,6 +568,24 @@ const sameProgress = [
 ]
 assert.equal(chooseTowerTarget({ x: 115, y: 100, range: 40 }, sameProgress)?.id, 'later', 'higher pathIndex then higher progress wins')
 
+// targeting priority modes
+const targetPool = [
+  { id: 'lead', x: 150, y: 100, hp: 20, pathIndex: 2, progress: 40, escaped: false },
+  { id: 'trail', x: 110, y: 100, hp: 60, pathIndex: 1, progress: 10, escaped: false },
+  { id: 'mid', x: 130, y: 100, hp: 40, pathIndex: 1, progress: 80, escaped: false },
+]
+const targetTower = { x: 130, y: 100, range: 90 }
+assert.equal(chooseTowerTarget(targetTower, targetPool, 'first')?.id, 'lead', 'first targets furthest along the path')
+assert.equal(chooseTowerTarget(targetTower, targetPool, 'last')?.id, 'trail', 'last targets the least advanced enemy')
+assert.equal(chooseTowerTarget(targetTower, targetPool, 'strongest')?.id, 'trail', 'strongest targets the highest hp enemy')
+assert.equal(chooseTowerTarget(targetTower, targetPool, 'nearest')?.id, 'mid', 'nearest targets the closest enemy')
+assert.equal(chooseTowerTarget(targetTower, targetPool)?.id, 'lead', 'omitted mode defaults to first for balance stability')
+assert.equal(chooseTowerTarget(targetTower, [], 'strongest'), undefined, 'no enemies yields no target under any mode')
+
+assert.equal(cycleTargetMode('first'), 'last', 'cycling advances to the next mode')
+assert.equal(cycleTargetMode('nearest'), 'first', 'cycling wraps around to the start')
+assert.equal(cycleTargetMode('first', -1), 'nearest', 'cycling backwards wraps to the end')
+
 assert.deepEqual(
   evaluateSlowImpact({ slowFactor: 1, slowUntil: 0 }, { slowFactor: 0.55, slowUntil: 1200 }, 100),
   { slowFactor: 0.55, slowUntil: 1200 },
@@ -730,6 +750,17 @@ assert.equal(completeSnapshot.phase, 'complete', 'complete phase at no waves lef
 assert.equal(completeSnapshot.nextEventMs, 0)
 assert.equal(completeSnapshot.toSpawnInCurrentWave, 0)
 assert.equal(nextWaveEnemy(waveState, 9999, waves), undefined)
+assert.deepEqual(
+  summarizeWave([{ enemies: ['a', 'a', 'b', 'a', 'c'], spawnEveryMs: 100 }], 0),
+  [
+    { type: 'a', count: 3 },
+    { type: 'b', count: 1 },
+    { type: 'c', count: 1 },
+  ],
+  'wave preview groups by type in first-appearance order',
+)
+assert.deepEqual(summarizeWave([{ enemies: ['a'], spawnEveryMs: 100 }], 5), [], 'out-of-range wave preview is empty')
+
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 0), { hp: 26, reward: 9 })
 assert.deepEqual(scaleEnemyStats({ hp: 26, reward: 9 }, 2), { hp: 35, reward: 13 })
 

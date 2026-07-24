@@ -7,13 +7,16 @@ import {
   nextWaveEnemy,
   prepareFirstWave,
   scaleEnemyStats,
+  summarizeWave,
   createWaveProgressSnapshot,
+  type WaveEnemyGroup,
   type WaveSpawnState,
   type WaveProgressSnapshot,
 } from './waveRules.js'
 
 export type { WaveSpawnState } from './waveRules.js'
 export type { WaveProgressSnapshot } from './waveRules.js'
+export type { WaveEnemyGroup } from './waveRules.js'
 
 export function createWaveState(
   startAt: number,
@@ -45,4 +48,8 @@ export function waveProgressSnapshot(state: WaveSpawnState, now: number, activeE
 
 export function makeEnemyStats(type: EnemyType, waveIndex: number) {
   return scaleEnemyStats(ENEMIES[type], waveIndex)
+}
+
+export function summarizeWaveEnemies(waveIndex: number): WaveEnemyGroup<EnemyType>[] {
+  return summarizeWave(WAVES, waveIndex)
 }

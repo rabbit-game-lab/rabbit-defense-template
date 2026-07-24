@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import { PATH, WAVES } from '../data/towerDefense'
+import { ENEMIES, PATH, WAVES } from '../data/towerDefense'
 import { EnemyView, type EnemyRuntime } from '../entities/EnemyView'
 import { createProjectile, type ProjectileRuntime } from '../entities/ProjectileView'
 import { chooseTowerTarget, damageEnemy, advanceEnemyAlongPath, distanceBetween } from './towerDefenseRules'
@@ -11,9 +11,12 @@ import {
   markEnemySpawned,
   nextEnemyToSpawn,
   prepareFirstWaveForCombat,
+  summarizeWaveEnemies,
   waveProgressSnapshot,
+  type WaveEnemyGroup,
   type WaveProgressSnapshot,
 } from './waves'
+import type { EnemyType } from '../data/towerDefense'
 import { playBossArrivalSfx, playDefeatSfx, playLeakSfx, playShotSfx } from './audioManager'
 import type { TowerRuntime } from '../entities/TowerView'
 import type { FeedbackLane } from './hudRules'
@@ -25,6 +28,7 @@ interface CombatCallbacks {
   onStatusUpdate: (status: string, lane: FeedbackLane) => void
   onEnemyKilled?: () => void
   onEnemyLeaked?: () => void
+  onWaveCleared?: (waveNumber: number) => void
 }
 
 export default class CombatSystem {
@@ -35,12 +39,21 @@ export default class CombatSystem {
   private projectiles: ProjectileRuntime[] = []
   private waveState = createWaveState(0)
   private nextId = 1
+  private clearedWaveCount = 0
+  /**
+   * Game-time clock in ms. Advanced by scaled delta each frame so a speed
+   * multiplier accelerates spawns, fire rate, and movement together. All combat
+   * scheduling reads this instead of scene.time.now, which the speed toggle
+   * cannot bend.
+   */
+  private clock = 0
 
   constructor(scene: Phaser.Scene, callbacks: CombatCallbacks) {
     this.scene = scene
     this.callbacks = callbacks
     this.effects = new EffectsSystem(scene)
-    this.waveState = createWaveState(this.scene.time.now, CONFIG.waves.betweenWaveDelayMs, CONFIG.waves.firstWavePrepareDelayMs)
+    this.clock = this.scene.time.now
+    this.waveState = createWaveState(this.clock, CONFIG.waves.betweenWaveDelayMs, CONFIG.waves.firstWavePrepareDelayMs)
   }
 
   get currentWave(): number {
@@ -60,20 +73,45 @@ export default class CombatSystem {
   }
 
   getWaveProgress(): WaveProgressSnapshot {
-    return waveProgressSnapshot(this.waveState, this.scene.time.now, this.enemies.length)
+    return waveProgressSnapshot(this.waveState, this.clock, this.enemies.length)
   }
 
-  prepareFirstWave(now: number): void {
-    prepareFirstWaveForCombat(this.waveState, now)
+  /** Enemy composition of the raid the player is about to face, or [] mid-combat. */
+  getUpcomingWavePreview(): WaveEnemyGroup<EnemyType>[] {
+    const progress = this.getWaveProgress()
+    if (progress.phase !== 'preparing' && progress.phase !== 'between') return []
+    return summarizeWaveEnemies(progress.wave - 1)
   }
 
-  update(delta: number, towers: readonly TowerRuntime[]): void {
+  prepareFirstWave(): void {
+    prepareFirstWaveForCombat(this.waveState, this.clock)
+  }
+
+  update(delta: number, towers: readonly TowerRuntime[], speed = 1): void {
     this.effects.update()
-    const now = this.scene.time.now
+    const scaledDelta = delta * speed
+    this.clock += scaledDelta
+    const now = this.clock
     this.spawnEnemies(now)
-    if (!this.updateEnemies(delta, now)) return
+    if (!this.updateEnemies(scaledDelta, now)) return
     this.updateTowers(now, towers)
-    this.updateProjectiles(delta, now)
+    this.updateProjectiles(scaledDelta, now)
+    this.settleClearedWaves()
+  }
+
+  /**
+   * Awards a bonus once each raid's spawns are exhausted and the field is clear.
+   * `waveState.waveIndex` counts fully-spawned raids; comparing it against the
+   * last settled count grants one bonus per newly cleared raid, even if several
+   * resolve in the same frame.
+   */
+  private settleClearedWaves(): void {
+    const spawnedWaves = this.waveState.waveIndex
+    if (this.enemies.length !== 0 || spawnedWaves <= this.clearedWaveCount) return
+    for (let wave = this.clearedWaveCount + 1; wave <= spawnedWaves; wave += 1) {
+      this.callbacks.onWaveCleared?.(wave)
+    }
+    this.clearedWaveCount = spawnedWaves
   }
 
   destroy(): void {
@@ -128,7 +166,7 @@ export default class CombatSystem {
     for (const tower of towers) {
       if (now < tower.nextShotAt) continue
 
-      const target = chooseTowerTarget(tower, this.enemies)
+      const target = chooseTowerTarget(tower, this.enemies, tower.targetMode)
       if (!target) continue
 
       tower.nextShotAt = now + tower.fireRateMs
@@ -209,6 +247,7 @@ export default class CombatSystem {
     enemy.view.destroy()
     this.callbacks.onStatusUpdate(`${enemy.name} breached Hidden Dojo!`, 'critical')
     this.callbacks.onEnemyLeaked?.()
+    this.effects.punchLeak()
     const canContinue = this.callbacks.onLivesLose(enemy.leakDamage)
     playLeakSfx()
     return canContinue
@@ -218,6 +257,8 @@ export default class CombatSystem {
     if (!this.enemies.includes(enemy)) return
 
     this.enemies = this.enemies.filter((item) => item !== enemy)
+    this.effects.showKill(enemy.x, enemy.y, ENEMIES[enemy.type].color)
+    this.effects.showCoinPop(enemy.x, enemy.y, enemy.reward)
     enemy.view.destroy()
     this.callbacks.onStatusUpdate(`${enemy.name} defeated +${enemy.reward} ryo.`, 'ambient')
     this.callbacks.onCoinsGain(enemy.reward)

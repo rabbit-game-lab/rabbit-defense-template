@@ -299,22 +299,56 @@ export function advanceEnemyAlongPath(enemy: MovingEnemyState, path: readonly Po
   return { x: finalPoint.x, y: finalPoint.y, pathIndex: path.length - 1, progress: 0, escaped: true }
 }
 
-export function chooseTowerTarget<T extends TargetableEnemy>(tower: TowerTargeter, enemies: readonly T[]): T | undefined {
+export type TargetMode = 'first' | 'last' | 'strongest' | 'nearest'
+
+export const TARGET_MODES: readonly TargetMode[] = ['first', 'last', 'strongest', 'nearest']
+
+export const TARGET_MODE_LABELS: Record<TargetMode, string> = {
+  first: 'First',
+  last: 'Last',
+  strongest: 'Strongest',
+  nearest: 'Nearest',
+}
+
+/**
+ * Returns true when `candidate` should replace the current `best` under `mode`.
+ * All comparisons are strict so ties keep the earlier-seen enemy, preserving the
+ * stable list-order behavior the rules tests depend on.
+ */
+function isBetterTarget<T extends TargetableEnemy>(candidate: T, best: T, mode: TargetMode, tower: TowerTargeter): boolean {
+  switch (mode) {
+    case 'first':
+      return candidate.pathIndex > best.pathIndex || (candidate.pathIndex === best.pathIndex && candidate.progress > best.progress)
+    case 'last':
+      return candidate.pathIndex < best.pathIndex || (candidate.pathIndex === best.pathIndex && candidate.progress < best.progress)
+    case 'strongest':
+      return candidate.hp > best.hp
+    case 'nearest':
+      return distanceBetween(tower, candidate) < distanceBetween(tower, best)
+  }
+}
+
+export function chooseTowerTarget<T extends TargetableEnemy>(
+  tower: TowerTargeter,
+  enemies: readonly T[],
+  mode: TargetMode = 'first',
+): T | undefined {
   let best: T | undefined
 
   for (const enemy of enemies) {
     if (enemy.hp <= 0 || enemy.escaped) continue
     if (distanceBetween(tower, enemy) > tower.range) continue
 
-    if (!best) {
-      best = enemy
-      continue
-    }
-
-    if (enemy.pathIndex > best.pathIndex || (enemy.pathIndex === best.pathIndex && enemy.progress > best.progress)) {
+    if (!best || isBetterTarget(enemy, best, mode, tower)) {
       best = enemy
     }
   }
 
   return best
+}
+
+export function cycleTargetMode(mode: TargetMode, step = 1): TargetMode {
+  const index = TARGET_MODES.indexOf(mode)
+  const base = index < 0 ? 0 : index
+  return TARGET_MODES[(base + step + TARGET_MODES.length) % TARGET_MODES.length]
 }
