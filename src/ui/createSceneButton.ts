@@ -88,6 +88,7 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
   let isHovering = false
   let isFocused = false
   let isDestroyed = false
+  let isVisible = true
 
   const applyState = (): void => {
     const target =
@@ -155,8 +156,9 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
   keyboard?.on('keydown-ENTER', onKeyboardActivate)
   keyboard?.on('keydown-SPACE', onKeyboardActivate)
 
-  const refreshEnabled = (enabled: boolean): void => {
-    if (enabled) {
+  // Interactivity derives from both flags so they can never disagree.
+  const refreshInteractive = (): void => {
+    if (isEnabled && isVisible) {
       bg.setInteractive({ useHandCursor: true })
     } else {
       bg.disableInteractive()
@@ -164,20 +166,26 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
   }
 
   applyState()
-  refreshEnabled(isEnabled)
+  refreshInteractive()
 
   return {
+    /**
+     * Idempotent by design. HUD code re-asserts button state every frame, and a
+     * pointer press spans several frames, so clearing isPressed on a no-op call
+     * would discard the press before pointerup could complete the click. Only a
+     * real enabled/disabled transition drops the transient press and hover state.
+     */
     setEnabled(enabled: boolean): void {
-      if (isDestroyed) return
+      if (isDestroyed || enabled === isEnabled) return
       isEnabled = enabled
       isPressed = false
       isHovering = false
-      refreshEnabled(enabled)
+      refreshInteractive()
       applyState()
     },
 
     setText(text: string): void {
-      if (isDestroyed) return
+      if (isDestroyed || label.text === text) return
       label.setText(text)
     },
 
@@ -188,10 +196,13 @@ export function createSceneButton(scene: Phaser.Scene, config: SceneButtonConfig
     },
 
     setVisible(visible: boolean): void {
-      if (isDestroyed) return
+      // Also re-asserted every frame; re-running setInteractive on each tick
+      // churns the hit area for no reason.
+      if (isDestroyed || visible === isVisible) return
+      isVisible = visible
       bg.setVisible(visible)
       label.setVisible(visible)
-      refreshEnabled(visible && isEnabled)
+      refreshInteractive()
     },
 
     trigger(): void {
