@@ -53,14 +53,6 @@ interface TowerPlacementOptions {
   onTowerSold?: (amount: number) => void
 }
 
-interface CardGesture {
-  type: TowerType
-  pointerId: number
-  startX: number
-  startY: number
-  dragging: boolean
-}
-
 export default class TowerPlacementSystem {
   private readonly towers: TowerRuntime[] = []
   private readonly preview: TerrainPlacementPreview
@@ -70,13 +62,12 @@ export default class TowerPlacementSystem {
   private cursorX = 16 + CONFIG.placement.cellSize * CONFIG.placement.cursorStartColumn
   private cursorY = 16 + CONFIG.placement.cellSize * CONFIG.placement.cursorStartRow
   private cursorEvaluation: PlacementEvaluation | null = null
-  private cardGesture?: CardGesture
   private suppressedPointerId?: number
   private nextId = 1
 
   constructor(private readonly scene: Phaser.Scene, private readonly options: TowerPlacementOptions) {
     this.preview = new TerrainPlacementPreview(scene)
-    this.shopCards = buildCards(scene, (type, pointer) => this.startCardGesture(type, pointer))
+    this.shopCards = buildCards(scene, (type, pointer) => this.selectShopCard(type, pointer))
     scene.input.on('pointermove', this.handlePointerMove)
     scene.input.on('pointerup', this.handlePointerUp)
     scene.input.on('pointerupoutside', this.handlePointerUp)
@@ -136,9 +127,8 @@ export default class TowerPlacementSystem {
   }
 
   cancelPlacement(): boolean {
-    const hadPending = Boolean(this.pendingTowerType || this.cardGesture)
+    const hadPending = Boolean(this.pendingTowerType)
     this.pendingTowerType = undefined
-    this.cardGesture = undefined
     this.cursorEvaluation = null
     this.preview.hide()
     if (hadPending) this.options.onStatusUpdate('Placement cancelled.')
@@ -280,38 +270,33 @@ export default class TowerPlacementSystem {
     this.options.onTowerPlaced?.(definition.type, x, y)
   }
 
+  /** While a tower is armed the ghost follows the pointer so the drop is previewed. */
   private readonly handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
-    if (this.cardGesture?.pointerId === pointer.id) {
-      const distance = Phaser.Math.Distance.Between(this.cardGesture.startX, this.cardGesture.startY, pointer.worldX, pointer.worldY)
-      if (distance > CONFIG.placement.dragThresholdPx) this.cardGesture.dragging = true
-      if (!this.cardGesture.dragging) return
-    }
     if (this.pendingTowerType) this.previewPlacementAt(pointer.worldX, pointer.worldY)
   }
 
   private readonly handlePointerUp = (pointer: Phaser.Input.Pointer): void => {
+    // The release belonging to a card or tower click must not also place a tower.
     if (this.suppressedPointerId === pointer.id) {
       this.suppressedPointerId = undefined
-      return
-    }
-    if (this.cardGesture?.pointerId === pointer.id) {
-      const shouldPlace = this.cardGesture.dragging
-      this.cardGesture = undefined
-      if (shouldPlace) this.placePendingAt(pointer.worldX, pointer.worldY)
       return
     }
     if (this.pendingTowerType) this.placePendingAt(pointer.worldX, pointer.worldY)
   }
 
   private readonly handleGameOut = (): void => {
-    if (!this.cardGesture?.dragging) return
-    this.preview.hide()
+    if (this.pendingTowerType) this.preview.hide()
   }
 
-  private startCardGesture(type: TowerType, pointer: Phaser.Input.Pointer): void {
+  /**
+   * Placement is two separate clicks: one on the card to arm, one on the board to
+   * build. The arming click's own pointerup is suppressed so it cannot immediately
+   * attempt a placement on the shop panel it landed in.
+   */
+  private selectShopCard(type: TowerType, pointer: Phaser.Input.Pointer): void {
     if (!this.beginPlacement(type)) return
     playClickSfx()
-    this.cardGesture = { type, pointerId: pointer.id, startX: pointer.worldX, startY: pointer.worldY, dragging: false }
+    this.suppressedPointerId = pointer.id
   }
 
   private getAnchors(): PlacedTowerAnchor[] {

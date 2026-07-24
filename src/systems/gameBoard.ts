@@ -38,7 +38,7 @@ export function drawPath(scene: Phaser.Scene): void {
   }).setOrigin(0.5).setDepth(2)
 }
 
-export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, pointer: Phaser.Input.Pointer) => void): ShopCard[] {
+export function buildCards(scene: Phaser.Scene, onSelect: (type: TowerType, pointer: Phaser.Input.Pointer) => void): ShopCard[] {
   const shopCfg = CONFIG.ui.shop
   const shopBounds = {
     left: shopCfg.panelX - shopCfg.panelWidth / 2,
@@ -92,7 +92,7 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
     card.add([cardBg, icon, nameText, costText])
     card.setSize(cardWidth, cardHeight)
     card.setInteractive(new Phaser.Geom.Rectangle(-cardWidth / 2, -cardHeight / 2, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains)
-    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onStartDrag(type, pointer))
+    card.on('pointerdown', (pointer: Phaser.Input.Pointer) => onSelect(type, pointer))
 
     // Called every frame, so both inputs are memoised: the shortfall keeps counting
     // down while a card stays unaffordable.
