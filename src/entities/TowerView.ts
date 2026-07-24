@@ -3,6 +3,7 @@ import { TOWER_TEXTURE_KEYS } from '../data/assets'
 import type { TowerDefinition, TowerType } from '../data/towerDefense'
 import type { TargetMode } from '../systems/towerDefenseRules'
 import { computeTowerLevelScale } from '../systems/towerPlacementVisuals'
+import { CONFIG } from '../game.config'
 
 export interface TowerRuntime {
   id: string
@@ -44,9 +45,9 @@ export class TowerView {
     this.levelText = scene.add
       .text(13, 13, '1', {
         fontSize: '10px',
-        color: '#fff4cf',
+        color: CONFIG.ui.textColor,
         fontStyle: 'bold',
-        backgroundColor: '#111827',
+        backgroundColor: CONFIG.ui.colors.badgeBackground,
         padding: { x: 2, y: 1 },
       })
       .setOrigin(0.5)

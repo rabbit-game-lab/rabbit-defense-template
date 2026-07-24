@@ -3,7 +3,7 @@ export const placementConfig = {
    * What: Width and height of one invisible terrain grid cell.
    * Feel: Small enough for precise layouts without visual clutter.
    * Range: 24–48.
-   * Related: cursorStartColumn, cursorStartRow, dragThresholdPx.
+   * Related: cursorStartColumn, cursorStartRow.
    * Units: logical pixels.
    */
   cellSize: 32,
@@ -15,14 +15,6 @@ export const placementConfig = {
    * Units: towers.
    */
   maxTowers: 6,
-  /**
-   * What: Pointer travel required before a card gesture becomes a drag shortcut.
-   * Feel: Taps arm placement while intentional movement drags a preview.
-   * Range: 4–16.
-   * Related: cellSize.
-   * Units: logical pixels.
-   */
-  dragThresholdPx: 8,
   /**
    * What: Half-width reserved around the enemy path center line.
    * Feel: Towers sit fully on grass without crowding raiders.

@@ -3,6 +3,12 @@ import type { TowerType } from '../data/towerDefense'
 import type { TowerView } from '../entities/TowerView'
 import { CONFIG } from '../game.config'
 import { isReducedEffectsEnabled } from './accessibilitySettingsStore'
+import {
+  clampPlacementSparkCount,
+  isEffectAllowed,
+  shouldSampleProjectileTrail,
+  type BattlefieldEffect,
+} from './effectPolicyRules'
 
 type RunOutcome = 'victory' | 'defeat'
 
@@ -41,8 +47,7 @@ export class EffectsSystem {
   }
 
   showPlacement(x: number, y: number, color = 0xf6d365): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) return
+    if (!this.allows('particles')) return
 
     const ring = this.trackMotion(
       this.scene.add.circle(x, y, 8, color, 0).setStrokeStyle(2, color, 0.95).setDepth(20),
@@ -55,7 +60,7 @@ export class EffectsSystem {
       onComplete: () => this.removeMotion(ring),
     })
 
-    const sparkCount = Math.min(6, CONFIG.effects.placementSparkCount)
+    const sparkCount = clampPlacementSparkCount(6, this.reducedEffects)
     for (let index = 0; index < sparkCount; index += 1) {
       const angle = (Math.PI * 2 * index) / sparkCount
       const spark = this.trackMotion(this.scene.add.circle(x, y, 2, color, 0.9).setDepth(20))
@@ -72,18 +77,19 @@ export class EffectsSystem {
 
   sampleProjectile(x: number, y: number, type: TowerType, now: number, lastSampleAt?: number): number {
     this.update()
-    if (this.reducedEffects || this.destroyed) return now
-    if (lastSampleAt !== undefined && now - lastSampleAt < CONFIG.effects.trailSampleMs) return lastSampleAt
+    if (this.destroyed) return now
+    // Reduced effects resets the stamp so re-enabling motion starts a fresh throttle window.
+    if (!isEffectAllowed('projectile-trail', this.reducedEffects)) return now
+    // Throttle + trail cap both live in the shared policy.
+    if (!shouldSampleProjectileTrail(now, lastSampleAt ?? null, this.trailMarks.length, this.reducedEffects)) {
+      return lastSampleAt ?? now
+    }
 
     const style = EFFECT_STYLE[type]
     const mark = this.trackMotion(
       this.scene.add.circle(x, y, style.trailRadius, style.color, type === 'arrow' ? 0.6 : 0.75).setDepth(7),
     )
     this.trailMarks.push(mark)
-    while (this.trailMarks.length > CONFIG.effects.maxTrails) {
-      const oldest = this.trailMarks.shift()
-      if (oldest) this.removeMotion(oldest)
-    }
     this.tween({
       targets: mark,
       alpha: 0,
@@ -98,8 +104,7 @@ export class EffectsSystem {
   }
 
   showImpact(x: number, y: number, type: TowerType, splashRadius?: number): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) return
+    if (!this.allows('flash')) return
 
     const style = EFFECT_STYLE[type]
     const targetRadius = type === 'bomb' && splashRadius ? splashRadius : type === 'frost' ? 18 : 10
@@ -119,8 +124,7 @@ export class EffectsSystem {
 
   /** Death burst: a fading ring plus evenly-spaced sparks in the enemy tint. */
   showKill(x: number, y: number, color: number): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) return
+    if (!this.allows('particles')) return
 
     const ring = this.trackMotion(
       this.scene.add.circle(x, y, 4, color, 0.5).setStrokeStyle(2, color, 0.8).setDepth(19),
@@ -150,12 +154,11 @@ export class EffectsSystem {
 
   /** Floating "+ryo" that rises from the defeated enemy and fades out. */
   showCoinPop(x: number, y: number, amount: number): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) return
+    if (!this.allows('tween')) return
 
     const text = this.trackMotion(
       this.scene.add.text(x, y - 8, `+${amount}`, {
-        color: '#ffe08a',
+        color: CONFIG.ui.colors.coinPop,
         fontFamily: 'monospace',
         fontSize: '11px',
         fontStyle: 'bold',
@@ -172,14 +175,12 @@ export class EffectsSystem {
 
   /** Small camera jolt when a raider breaches the dojo. */
   punchLeak(): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) return
+    if (!this.allows('camera-shake')) return
     this.scene.cameras.main.shake(CONFIG.effects.leakShakeMs, CONFIG.effects.leakShakeIntensity)
   }
 
   pulseTower(tower: TowerView): void {
-    this.update()
-    if (this.reducedEffects || this.destroyed) {
+    if (!this.allows('firing-pulse')) {
       tower.cancelPulse()
       return
     }
@@ -189,21 +190,21 @@ export class EffectsSystem {
   }
 
   showBossArrival(x: number, y: number): void {
-    this.update()
-    if (this.destroyed) return
+    // The warning itself is information, not decoration, so it survives reduced effects.
+    if (!this.allows('static-warning')) return
 
     const warning = this.trackStatic(
       this.scene.add.text(CONFIG.screen.width / 2, 48, '⚠ SHOGUN APPROACHES ⚠', {
-        color: '#ffcf8b',
+        color: CONFIG.ui.colors.bossWarning,
         fontFamily: 'monospace',
         fontSize: '14px',
         fontStyle: 'bold',
-        backgroundColor: '#3a1608',
+        backgroundColor: CONFIG.ui.colors.bossWarningBackground,
         padding: { x: 8, y: 4 },
       }).setOrigin(0.5).setDepth(80),
     )
     this.scene.time.delayedCall(1800, () => this.removeStatic(warning))
-    if (this.reducedEffects) return
+    if (!isEffectAllowed('halo', this.reducedEffects)) return
 
     this.scene.cameras.main.shake(CONFIG.effects.bossShakeMs, CONFIG.effects.bossShakeIntensity)
     const halo = this.trackMotion(
@@ -219,20 +220,20 @@ export class EffectsSystem {
   }
 
   showResult(outcome: RunOutcome): void {
-    this.update()
-    if (this.destroyed) return
+    // The outcome label is information, not decoration, so it survives reduced effects.
+    if (!this.allows('result-content')) return
 
     const victory = outcome === 'victory'
     const label = this.trackStatic(
       this.scene.add.text(CONFIG.screen.width / 2, CONFIG.screen.height / 2 - 72, victory ? 'DOJO SECURED' : 'DOJO FALLEN', {
-        color: victory ? '#d8f5a2' : '#ffaaa0',
+        color: victory ? CONFIG.ui.colors.victoryLabel : CONFIG.ui.colors.danger,
         fontFamily: 'monospace',
         fontSize: '18px',
         fontStyle: 'bold',
       }).setOrigin(0.5).setDepth(70),
     )
     this.scene.time.delayedCall(1600, () => this.removeStatic(label))
-    if (this.reducedEffects) return
+    if (!isEffectAllowed('flash', this.reducedEffects)) return
 
     const color = victory ? 0x9bd46a : 0x9d2f2f
     const frame = this.trackMotion(
@@ -268,6 +269,16 @@ export class EffectsSystem {
     this.clearMotion()
     for (const object of this.staticObjects) object.destroy()
     this.staticObjects.clear()
+  }
+
+  /**
+   * Single gate for every presentation call: refreshes the reduced-effects poll,
+   * then defers to the shared policy so REDUCED_EFFECTS_SAFE stays authoritative.
+   */
+  private allows(effect: BattlefieldEffect): boolean {
+    this.update()
+    if (this.destroyed) return false
+    return isEffectAllowed(effect, this.reducedEffects)
   }
 
   private tween(config: Phaser.Types.Tweens.TweenBuilderConfig): void {

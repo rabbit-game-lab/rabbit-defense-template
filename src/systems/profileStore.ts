@@ -2,7 +2,6 @@ import * as sdk from '../rabbit/sdk'
 import {
   PROFILE_SCHEMA_VERSION,
   PROFILE_STORAGE_KEY,
-  createEmptyProfile,
   deserializeProfile,
   ensureOnboardingComplete,
   serializeProfile,
@@ -83,10 +82,6 @@ export async function loadProfile(): Promise<ProfileRecord> {
   return cloneProfile(await loading)
 }
 
-export function getCachedProfile(): ProfileRecord | null {
-  return cache ? cloneProfile(cache) : null
-}
-
 export async function persistProfile(profile: ProfileRecord): Promise<ProfileRecord> {
   const safe = profile.schemaVersion === PROFILE_SCHEMA_VERSION ? profile : { ...profile, schemaVersion: PROFILE_SCHEMA_VERSION }
   const payload = serializeProfile(safe)
@@ -116,15 +111,6 @@ export async function updateProfile(mutator: ProfileMutation): Promise<ProfileRe
     () => undefined,
   )
   return mutation
-}
-
-export function createInitialProfileFallback(): ProfileRecord {
-  return createEmptyProfile()
-}
-
-export async function ensureProfileInitialized(): Promise<ProfileRecord> {
-  if (cache && hasCached) return cloneProfile(cache)
-  return loadProfile()
 }
 
 export async function markOnboardingComplete(): Promise<ProfileRecord> {

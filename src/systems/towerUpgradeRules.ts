@@ -1,3 +1,5 @@
+import { CONFIG } from '../game.config.js'
+
 export interface TowerUpgradeStats {
   level: number
   damage: number
@@ -50,12 +52,13 @@ export type TowerUpgradeRequestOutcome =
     }
 
 export function computeTowerUpgrade(tower: TowerUpgradeStats): TowerUpgradeStats {
+  const { damageMultiplier, rangeBonus, fireRateMultiplier, costMultiplier } = CONFIG.run.upgrade
   return {
     level: tower.level + 1,
-    damage: Math.round(tower.damage * 1.5),
-    range: tower.range + 10,
-    fireRateMs: Math.round(tower.fireRateMs * 0.9),
-    upgradeCost: Math.round(tower.upgradeCost * 1.5),
+    damage: Math.round(tower.damage * damageMultiplier),
+    range: tower.range + rangeBonus,
+    fireRateMs: Math.round(tower.fireRateMs * fireRateMultiplier),
+    upgradeCost: Math.round(tower.upgradeCost * costMultiplier),
     maxLevel: tower.maxLevel,
   }
 }

@@ -1,3 +1,5 @@
+import { CONFIG } from '../game.config.js'
+
 export interface WaveLike<TEnemy> {
   enemies: readonly TEnemy[]
   spawnEveryMs: number
@@ -174,10 +176,11 @@ export function summarizeWave<TEnemy>(
 }
 
 export function scaleEnemyStats<TEnemy extends ScalableEnemy>(base: TEnemy, waveIndex: number): TEnemy {
-  const scale = 1 + waveIndex * 0.18
+  const { hpScalePerWave, rewardPerWave } = CONFIG.waves.difficulty
+  const scale = 1 + waveIndex * hpScalePerWave
   return {
     ...base,
     hp: Math.round(base.hp * scale),
-    reward: base.reward + Math.floor(waveIndex * 2),
+    reward: base.reward + Math.floor(waveIndex * rewardPerWave),
   }
 }

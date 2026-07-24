@@ -79,7 +79,7 @@ export default class GameScene extends Phaser.Scene {
   private hasPlayedFanfare = false
   private uiBlocked = false
   private lastAnnouncedWave = 0
-  private gameSpeed = 1
+  private gameSpeed: number = CONFIG.run.speedSteps[0]
 
   constructor() {
     super('GameScene')
@@ -97,7 +97,7 @@ export default class GameScene extends Phaser.Scene {
     this.feedback = {}
     this.uiBlocked = false
     this.lastAnnouncedWave = 0
-    this.gameSpeed = 1
+    this.gameSpeed = CONFIG.run.speedSteps[0]
     this.coins = CONFIG.run.startingCoins
     this.lives = CONFIG.run.startingLives
     this.result = null
@@ -195,6 +195,7 @@ export default class GameScene extends Phaser.Scene {
     if (!isRunActive(this.runState)) return
 
     this.onboardingState = this.applyOnboardingTransition(applyObjectiveAutoAdvance(this.onboardingState, this.time.now))
+    this.placement.refreshShopAffordability(this.coins)
     this.combat.update(delta, this.placement.getTowers(), this.gameSpeed)
     const wave = this.combat.getWaveProgress()
     if (wave.phase === 'active' && wave.wave !== this.lastAnnouncedWave) {
@@ -207,6 +208,8 @@ export default class GameScene extends Phaser.Scene {
   getHudState(): HudState {
     const waveProgress = this.combat.getWaveProgress()
     const stepInstruction = getOnboardingInstruction(this.onboardingState.step)
+    // Built once per frame: the snapshot maps over every tower and the shop list.
+    const placement = this.placement.getSnapshot(this.coins)
 
     return {
       coins: this.coins,
@@ -217,8 +220,8 @@ export default class GameScene extends Phaser.Scene {
       enemiesToSpawn: waveProgress.toSpawnInCurrentWave,
       activeEnemies: this.combat.activeEnemyCount,
       nextWaveInMs: waveProgress.nextEventMs,
-      selectedTower: this.placement.getSnapshot(this.coins).selectedTower,
-      placement: this.placement.getSnapshot(this.coins),
+      selectedTower: placement.selectedTower,
+      placement,
       status: resolveFeedbackStatus(
         this.time.now,
         this.feedback,
@@ -254,7 +257,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   toggleGameSpeed(): number {
-    this.gameSpeed = this.gameSpeed === 1 ? 2 : 1
+    const steps = CONFIG.run.speedSteps
+    const current = steps.indexOf(this.gameSpeed)
+    this.gameSpeed = steps[(current + 1) % steps.length]
     this.setFeedback('action', `Battle speed ${this.gameSpeed}×.`)
     return this.gameSpeed
   }

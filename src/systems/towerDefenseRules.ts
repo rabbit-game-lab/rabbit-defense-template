@@ -1,9 +1,5 @@
 import { canAffordTower, refundForTower, spendCoins } from './towerEconomyRules.js'
-import {
-  type PlacementOutOfRangeReason,
-  type TowerEconomyLike,
-  type TowerPlacementCostLike,
-} from './towerEconomyRules.js'
+import { type TowerEconomyLike } from './towerEconomyRules.js'
 import {
   computeTowerUpgrade,
   createTowerUpgradePreview,
@@ -18,37 +14,6 @@ import {
 export interface Point {
   x: number
   y: number
-}
-
-export interface BuildPadState {
-  x: number
-  y: number
-  occupied: boolean
-}
-
-export interface PlacementDropOutcomeSuccess {
-  type: 'success'
-  target: BuildPadState
-  spendAmount: number
-  nextCoins: number
-  status: string
-}
-
-export interface PlacementDropOutcomeFailed {
-  type: 'cancelled'
-  reason: PlacementOutOfRangeReason
-  target: BuildPadState | undefined
-  spendAmount: 0
-  nextCoins: number
-  status: string
-}
-
-export type PlacementDropOutcome = PlacementDropOutcomeSuccess | PlacementDropOutcomeFailed
-
-export interface PlacementProbe {
-  nearestPad: BuildPadState | undefined
-  validPad: BuildPadState | undefined
-  valid: boolean
 }
 
 export interface MovingEnemyState extends Point {
@@ -94,83 +59,11 @@ export {
 }
 
 export type {
-  PlacementOutOfRangeReason,
   TowerEconomyLike,
-  TowerPlacementCostLike,
   TowerUpgradeDeltas,
   TowerUpgradePreview,
   TowerUpgradeRequestOutcome,
   TowerUpgradeStats,
-}
-
-export function findNearestPadWithinRadius(
-  pointer: Point,
-  pads: readonly BuildPadState[],
-  radius: number,
-): PlacementProbe {
-  let nearestPad: BuildPadState | undefined
-  let nearestDistance = Infinity
-
-  for (const pad of pads) {
-    const distance = distanceBetween(pad, pointer)
-    if (distance > radius || distance >= nearestDistance) continue
-    nearestPad = pad
-    nearestDistance = distance
-  }
-
-  const validPad = nearestPad && !nearestPad.occupied ? nearestPad : undefined
-  return { nearestPad, validPad, valid: Boolean(validPad) }
-}
-
-export function resolvePlacementDrop(
-  pointer: Point,
-  pads: readonly BuildPadState[],
-  radius: number,
-  tower: TowerPlacementCostLike,
-  currentCoins: number,
-): PlacementDropOutcome {
-  const { nearestPad, validPad } = findNearestPadWithinRadius(pointer, pads, radius)
-
-  if (!validPad) {
-    if (nearestPad?.occupied) {
-      return {
-        type: 'cancelled',
-        reason: 'occupied-pad',
-        target: nearestPad,
-        spendAmount: 0,
-        nextCoins: currentCoins,
-        status: 'That build circle is already occupied.',
-      }
-    }
-
-    return {
-      type: 'cancelled',
-      reason: 'outside-range',
-      target: undefined,
-      spendAmount: 0,
-      nextCoins: currentCoins,
-      status: 'Drag cancelled — drop on a glowing circle.',
-    }
-  }
-
-  if (currentCoins < tower.cost) {
-    return {
-      type: 'cancelled',
-      reason: 'insufficient-funds',
-      target: validPad,
-      spendAmount: 0,
-      nextCoins: currentCoins,
-      status: `Need ${tower.cost} ryo to build ${tower.towerName}.`,
-    }
-  }
-
-  return {
-    type: 'success',
-    target: validPad,
-    spendAmount: tower.cost,
-    nextCoins: currentCoins - tower.cost,
-    status: `${tower.towerName} placed.`,
-  }
 }
 
 export function distanceBetween(a: Point, b: Point): number {

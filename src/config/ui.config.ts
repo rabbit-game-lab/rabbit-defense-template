@@ -1,6 +1,33 @@
 export const uiConfig = {
   panelColor: 0x1f2b20,
   textColor: '#fff4cf',
+  /**
+   * What: Named text colors, grouped by the meaning they carry rather than by hue.
+   * Feel: Roles that mean different things stay separate entries even when they
+   *       currently share a value, so one can be retuned without dragging the
+   *       others with it.
+   * Range: any CSS hex string.
+   * Related: panelColor and textColor above; world.accentColor for shapes.
+   * Units: CSS hex strings (Phaser text styles take strings, not 0x numbers).
+   */
+  colors: {
+    accentText: '#ffd56a',
+    positive: '#bde88f',
+    danger: '#ffaaa0',
+    hint: '#a9c49c',
+    subtitle: '#c8d8b6',
+    coinPop: '#ffe08a',
+    bossWarning: '#ffcf8b',
+    bossWarningBackground: '#3a1608',
+    victoryLabel: '#d8f5a2',
+    placementValid: '#d9ffd8',
+    placementInvalid: '#ffd0ca',
+    placementBadgeBackground: '#172219',
+    enemyLabel: '#f7d89f',
+    enemyLabelBackground: '#3a1608',
+    badgeBackground: '#111827',
+    loadingText: '#ffffff',
+  },
   // What: Global UI dimensions shared across reusable components.
   // Feel: Keep all interactive controls at or above touch-target minimum.
   // Range: 44..140px for typical buttons.
@@ -139,19 +166,47 @@ export const uiConfig = {
     bottomY: 442,
     bottomWidth: 784,
     bottomHeight: 72,
-    selectedTextX: 28,
-    statusTextX: 212,
+    /**
+     * What: The bottom HUD is a two-column layout — a stacked text column on the
+     *       left, the action buttons on the right.
+     * Feel: Text never runs under a button; anything too long is ellipsised at
+     *       textZoneRightX rather than overlapping.
+     * Range: textZoneRightX must stay <= the leftmost button edge
+     *        (targetButtonX - targetButtonWidth / 2) minus a small gutter.
+     * Related: actionButtonY and the three *ButtonX entries below.
+     * Units: px (logical pixels).
+     */
+    textLeftX: 28,
+    textZoneRightX: 400,
     selectedFontSize: '13px',
     statusFontSize: '12px',
     previewFontSize: '11px',
-    upgradeButtonWidth: 140,
-    upgradeButtonHeight: 56,
+    hintFontSize: '10px',
+    // Four stacked rows, measured down from the top of the bottom panel.
+    selectedLineY: 5,
+    statusLineY: 22,
+    previewLineY: 39,
+    hintLineY: 55,
+    /**
+     * What: The action button row, right-aligned in the bottom panel.
+     * Feel: Thumb-reachable and never overlapping the text column.
+     * Range: each width >= buttonDefaults.minTouchablePx.
+     * Related: textZoneRightX above, which must clear targetButtonX.
+     * Units: px (logical pixels); *X values are centres.
+     */
+    actionButtonY: 442,
+    targetButtonX: 466,
+    targetButtonWidth: 116,
+    sellButtonX: 588,
+    sellButtonWidth: 104,
     upgradeButtonX: 708,
-    upgradeButtonY: 442,
+    upgradeButtonWidth: 128,
+    upgradeButtonHeight: 56,
     upgradeButtonFontSize: '13px',
-    selectedLineY: 7,
-    statusLineY: 29,
-    previewLineY: 49,
+    /** Top HUD: the raid line must stop before the speed button. */
+    waveTextX: 250,
+    waveZoneRightX: 464,
+    speedButtonX: 500,
     infoTextColor: '#c8d8b6',
     maxLevelText: 'MAX',
   },

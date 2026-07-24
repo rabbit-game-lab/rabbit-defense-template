@@ -49,7 +49,7 @@ export class ResultPanelController {
       fontSize: '28px', color: CONFIG.ui.textColor, fontStyle: 'bold',
     }).setOrigin(0.5).setDepth(depth + 2)
     this.summary = scene.add.text(x, y - 58, '', {
-      fontSize: '16px', color: '#ffd56a', align: 'center',
+      fontSize: '16px', color: CONFIG.ui.colors.accentText, align: 'center',
     }).setOrigin(0.5).setDepth(depth + 2)
     this.resources = scene.add.text(x, y - 14, '', {
       fontSize: '15px', color: CONFIG.ui.textColor,
@@ -81,7 +81,7 @@ export class ResultPanelController {
     }
     const { result, profile } = hud
     this.title.setText(result.outcome === 'victory' ? 'Victory · Dojo Secured' : 'Defeat · Dojo Fallen')
-    this.title.setColor(result.outcome === 'victory' ? '#bde88f' : '#ffaaa0')
+    this.title.setColor(result.outcome === 'victory' ? CONFIG.ui.colors.positive : CONFIG.ui.colors.danger)
     this.summary.setText(
       `Raids cleared  ${result.wavesCleared}/${hud.totalWaves}\nDefeated  ${result.kills}    Breaches  ${result.leaks}    Time  ${formatDuration(result.durationMs)}`,
     )

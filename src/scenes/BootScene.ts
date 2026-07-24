@@ -1,6 +1,7 @@
 /** Loads every asset declared in data/assets.ts, then starts the game. */
 import Phaser from 'phaser'
 import { IMAGES } from '../data/assets'
+import { CONFIG } from '../game.config'
 import { initializePersistedAudioSettings } from '../systems/audioStartup.js'
 import { applyAudioSettings } from '../systems/audioManager.js'
 import { loadAudioSettings } from '../systems/audioSettingsStore.js'
@@ -66,7 +67,7 @@ export default class BootScene extends Phaser.Scene {
     const loadingText = this.add
       .text(width / 2, height / 2 - 30, 'Loading...', {
         fontSize: '16px',
-        color: '#ffffff',
+        color: CONFIG.ui.colors.loadingText,
       })
       .setOrigin(0.5)
 

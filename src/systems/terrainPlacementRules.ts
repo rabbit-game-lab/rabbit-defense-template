@@ -58,7 +58,7 @@ export function placementReasonMessage(
     case 'spacing':
       return 'Leave the required empty grass squares between towers.'
     case 'tower-limit':
-      return `Tower limit reached (${CONFIG.placement.maxTowers}). Sell a tower to build another.`
+      return `Tower limit reached (${CONFIG.placement.maxTowers}). Sell one to build more.`
     case 'insufficient-funds':
       return `Need ${Math.max(0, shortfall)} more ryo to build this tower.`
   }

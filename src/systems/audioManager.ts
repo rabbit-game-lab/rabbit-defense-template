@@ -144,14 +144,3 @@ export function playFanfareSfx(): void {
   playTone(440, 660, 0.14, 0.22)
   window.setTimeout(() => playTone(660, 990, 0.18, 0.2), 90)
 }
-
-/** Reusable decaying white-noise burst for future effects. */
-export function makeNoiseBurst(c: AudioContext, seconds: number): AudioBufferSourceNode {
-  const bufferSize = c.sampleRate * seconds
-  const buffer = c.createBuffer(1, bufferSize, c.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize)
-  const source = c.createBufferSource()
-  source.buffer = buffer
-  return source
-}
