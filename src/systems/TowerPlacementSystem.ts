@@ -4,7 +4,7 @@ import { SHOP_TOWER_ORDER, TOWERS, type TowerDefinition, type TowerType } from '
 import type { PlacementEvaluation, PlacedTowerAnchor } from '../data/terrain'
 import { buildCards, type ShopCard } from './gameBoard'
 import { evaluateTerrainPlacement } from './terrainPlacementRules'
-import { createTowerUpgradePreview, resolveTowerUpgradeRequest, type TowerUpgradeStats } from './towerDefenseRules'
+import { createTowerUpgradePreview, cycleTargetMode, resolveTowerUpgradeRequest, TARGET_MODE_LABELS, type TargetMode, type TowerUpgradeStats } from './towerDefenseRules'
 import { refundForTower } from './towerEconomyRules'
 import { playBuildSfx, playClickSfx } from './audioManager'
 import { TowerView, type TowerRuntime } from '../entities/TowerView'
@@ -24,6 +24,8 @@ export interface TowerPlacementSelectedTower {
   maxed: boolean
   sellRefund: number
   sellEnabled: boolean
+  targetMode: TargetMode
+  targetModeLabel: string
 }
 
 export interface TowerPlacementSnapshot {
@@ -217,6 +219,16 @@ export default class TowerPlacementSystem {
     return true
   }
 
+  cycleSelectedTowerTargetMode(step = 1): boolean {
+    if (!this.options.canInteract()) return this.reject('Select a defense first to set its targeting.')
+    const tower = this.towers.find((item) => item.id === this.selectedTowerId)
+    if (!tower) return this.reject('Select a defense first to set its targeting.')
+    tower.targetMode = cycleTargetMode(tower.targetMode, step)
+    this.options.onStatusUpdate(`${TOWERS[tower.type].name} now targets ${TARGET_MODE_LABELS[tower.targetMode]}.`)
+    playClickSfx()
+    return true
+  }
+
   sellSelectedTower(): boolean {
     if (!this.options.canInteract()) return this.reject('Cannot sell now.')
     const tower = this.towers.find((item) => item.id === this.selectedTowerId)
@@ -242,7 +254,7 @@ export default class TowerPlacementSystem {
 
   private placeTower(definition: TowerDefinition, x: number, y: number): void {
     const view = new TowerView(this.scene, definition, x, y)
-    const tower: TowerRuntime = { ...definition, id: `tower-${this.nextId++}`, x, y, level: 1, investedCost: definition.cost, nextShotAt: 0, view }
+    const tower: TowerRuntime = { ...definition, id: `tower-${this.nextId++}`, x, y, level: 1, investedCost: definition.cost, nextShotAt: 0, targetMode: 'first', view }
     view.setRange(tower.range)
     this.towers.push(tower)
     this.selectTower(tower.id)
@@ -309,6 +321,7 @@ export default class TowerPlacementSystem {
       damage: tower.damage, range: tower.range, fireRateMs: tower.fireRateMs,
       upgradeCost: tower.upgradeCost, affordable: !maxed && coins >= tower.upgradeCost,
       upgrade, maxed, sellRefund: refundForTower(tower, CONFIG.run.refundRatio), sellEnabled: true,
+      targetMode: tower.targetMode, targetModeLabel: TARGET_MODE_LABELS[tower.targetMode],
     }
   }
 

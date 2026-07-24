@@ -34,7 +34,7 @@ import {
   type HudFeedback,
 } from '../systems/hudRules'
 import type { WaveProgressSnapshot } from '../systems/waves'
-import { TOWERS, type TowerType } from '../data/towerDefense'
+import { ENEMIES, TOWERS, type TowerType } from '../data/towerDefense'
 import type { PlacementEvaluation } from '../data/terrain'
 import { announceHpLoss, announcePlacement, announceRaid, announceResult } from '../accessibility/liveAnnouncements'
 
@@ -53,6 +53,8 @@ export interface HudState {
   onboardingStep: OnboardingStep
   onboardingInstruction: string
   waveLabel: string
+  nextWavePreview: string
+  gameSpeed: number
   result: RunResultSnapshot | null
   profile: ProfileRecord
 }
@@ -77,6 +79,7 @@ export default class GameScene extends Phaser.Scene {
   private hasPlayedFanfare = false
   private uiBlocked = false
   private lastAnnouncedWave = 0
+  private gameSpeed = 1
 
   constructor() {
     super('GameScene')
@@ -94,6 +97,7 @@ export default class GameScene extends Phaser.Scene {
     this.feedback = {}
     this.uiBlocked = false
     this.lastAnnouncedWave = 0
+    this.gameSpeed = 1
     this.coins = CONFIG.run.startingCoins
     this.lives = CONFIG.run.startingLives
     this.result = null
@@ -125,6 +129,13 @@ export default class GameScene extends Phaser.Scene {
       onEnemyKilled: () => {
         this.runResultTracker = recordKill(this.runResultTracker)
       },
+      onWaveCleared: (waveNumber: number) => {
+        const { base, perWave } = CONFIG.run.waveClearBonus
+        const bonus = base + perWave * (waveNumber - 1)
+        if (bonus <= 0) return
+        this.coins += bonus
+        this.setFeedback('ambient', `Raid ${waveNumber} cleared — +${bonus} ryo bonus.`)
+      },
     })
 
     this.placement = new TowerPlacementSystem(this, {
@@ -146,7 +157,7 @@ export default class GameScene extends Phaser.Scene {
         this.handleOnboardingEvent('tower-placed')
         if (!this.hasPlacedFirstTower) {
           this.hasPlacedFirstTower = true
-          this.combat.prepareFirstWave(this.time.now)
+          this.combat.prepareFirstWave()
         }
       },
       onTowerUpgraded: () => {
@@ -184,7 +195,7 @@ export default class GameScene extends Phaser.Scene {
     if (!isRunActive(this.runState)) return
 
     this.onboardingState = this.applyOnboardingTransition(applyObjectiveAutoAdvance(this.onboardingState, this.time.now))
-    this.combat.update(delta, this.placement.getTowers())
+    this.combat.update(delta, this.placement.getTowers(), this.gameSpeed)
     const wave = this.combat.getWaveProgress()
     if (wave.phase === 'active' && wave.wave !== this.lastAnnouncedWave) {
       this.lastAnnouncedWave = wave.wave
@@ -214,11 +225,20 @@ export default class GameScene extends Phaser.Scene {
         getRunFallbackStatus(this.hasPlacedFirstTower),
       ),
       waveLabel: formatWaveHud(waveProgress, this.combat.activeEnemyCount),
+      nextWavePreview: this.formatWavePreview(),
+      gameSpeed: this.gameSpeed,
       onboardingStep: this.onboardingState.step,
       onboardingInstruction: stepInstruction,
       result: this.result,
       profile: this.profile,
     }
+  }
+
+  private formatWavePreview(): string {
+    const groups = this.combat.getUpcomingWavePreview()
+    if (groups.length === 0) return ''
+    const parts = groups.map((group) => `${group.count}× ${ENEMIES[group.type].name.split(' ')[0]}`)
+    return `Next raid: ${parts.join(' · ')}`
   }
 
   upgradeSelectedTower(): boolean {
@@ -227,6 +247,16 @@ export default class GameScene extends Phaser.Scene {
 
   sellSelectedTower(): boolean {
     return this.placement.sellSelectedTower()
+  }
+
+  cycleSelectedTowerTargetMode(step = 1): boolean {
+    return this.placement.cycleSelectedTowerTargetMode(step)
+  }
+
+  toggleGameSpeed(): number {
+    this.gameSpeed = this.gameSpeed === 1 ? 2 : 1
+    this.setFeedback('action', `Battle speed ${this.gameSpeed}×.`)
+    return this.gameSpeed
   }
 
   setUiBlocked(blocked: boolean): void {

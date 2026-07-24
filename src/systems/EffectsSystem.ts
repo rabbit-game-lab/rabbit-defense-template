@@ -117,6 +117,66 @@ export class EffectsSystem {
     })
   }
 
+  /** Death burst: a fading ring plus evenly-spaced sparks in the enemy tint. */
+  showKill(x: number, y: number, color: number): void {
+    this.update()
+    if (this.reducedEffects || this.destroyed) return
+
+    const ring = this.trackMotion(
+      this.scene.add.circle(x, y, 4, color, 0.5).setStrokeStyle(2, color, 0.8).setDepth(19),
+    )
+    this.tween({
+      targets: ring,
+      radius: 17,
+      alpha: 0,
+      duration: CONFIG.effects.killBurstMs,
+      onComplete: () => this.removeMotion(ring),
+    })
+
+    const sparks = CONFIG.effects.killSparkCount
+    for (let index = 0; index < sparks; index += 1) {
+      const angle = (Math.PI * 2 * index) / sparks
+      const spark = this.trackMotion(this.scene.add.circle(x, y, 2, color, 0.95).setDepth(19))
+      this.tween({
+        targets: spark,
+        x: x + Math.cos(angle) * 20,
+        y: y + Math.sin(angle) * 20,
+        alpha: 0,
+        duration: CONFIG.effects.killBurstMs,
+        onComplete: () => this.removeMotion(spark),
+      })
+    }
+  }
+
+  /** Floating "+ryo" that rises from the defeated enemy and fades out. */
+  showCoinPop(x: number, y: number, amount: number): void {
+    this.update()
+    if (this.reducedEffects || this.destroyed) return
+
+    const text = this.trackMotion(
+      this.scene.add.text(x, y - 8, `+${amount}`, {
+        color: '#ffe08a',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(30),
+    )
+    this.tween({
+      targets: text,
+      y: y - 8 - CONFIG.effects.coinPopRisePx,
+      alpha: 0,
+      duration: CONFIG.effects.coinPopMs,
+      onComplete: () => this.removeMotion(text),
+    })
+  }
+
+  /** Small camera jolt when a raider breaches the dojo. */
+  punchLeak(): void {
+    this.update()
+    if (this.reducedEffects || this.destroyed) return
+    this.scene.cameras.main.shake(CONFIG.effects.leakShakeMs, CONFIG.effects.leakShakeIntensity)
+  }
+
   pulseTower(tower: TowerView): void {
     this.update()
     if (this.reducedEffects || this.destroyed) {
@@ -145,6 +205,7 @@ export class EffectsSystem {
     this.scene.time.delayedCall(1800, () => this.removeStatic(warning))
     if (this.reducedEffects) return
 
+    this.scene.cameras.main.shake(CONFIG.effects.bossShakeMs, CONFIG.effects.bossShakeIntensity)
     const halo = this.trackMotion(
       this.scene.add.circle(x, y, 22, 0xf4cf6e, 0.12).setStrokeStyle(3, 0xf4cf6e, 0.85).setDepth(6),
     )

@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { TOWER_TEXTURE_KEYS } from '../data/assets'
 import type { TowerDefinition, TowerType } from '../data/towerDefense'
+import type { TargetMode } from '../systems/towerDefenseRules'
 import { computeTowerLevelScale } from '../systems/towerPlacementVisuals'
 
 export interface TowerRuntime {
@@ -18,6 +19,7 @@ export interface TowerRuntime {
   fireRateMs: number
   projectileSpeed: number
   nextShotAt: number
+  targetMode: TargetMode
   slowFactor?: number
   slowMs?: number
   splashRadius?: number
