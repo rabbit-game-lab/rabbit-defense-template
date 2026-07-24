@@ -45,22 +45,6 @@ export function resolveFeedbackStatus(
   return fallback
 }
 
-export function resolveHudStatus(
-  nowMs: number,
-  placementMessage: TimedHudMessage | undefined,
-  combatMessage: TimedHudMessage | undefined,
-  fallback: string,
-): string {
-  return resolveFeedbackStatus(
-    nowMs,
-    {
-      action: placementMessage,
-      ambient: combatMessage,
-    },
-    fallback,
-  )
-}
-
 export function getRunFallbackStatus(hasPlacedTower: boolean): string {
   return hasPlacedTower
     ? 'Defend Hidden Dojo — build or upgrade between raids.'

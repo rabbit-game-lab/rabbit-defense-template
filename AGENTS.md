@@ -24,7 +24,6 @@ src/
     GameScene.ts          Placeholder scene — replace its visuals with the real game.
     UIScene.ts            HUD overlay stub — polls GameScene.getHudState() every frame.
   systems/
-    input.ts              Input snapshot (keyboard + pointer). Extend for swipe/virtual buttons.
     audioManager.ts       Procedural WebAudio SFX + mute. Copy playClickSfx for new sounds.
   data/
     assets.ts             Asset manifest (empty). All art is declared here, never hardcoded paths.
@@ -58,11 +57,11 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 
 ## Architecture
 
-`main.ts` boots Phaser with the `SCENES` registry, wires the platform SDK (ready/error handshake, pause/restart/mute, container resize) and never changes. `BootScene` loads every texture declared in `data/assets.ts` and hands off to `GameScene`. `GameScene` owns gameplay and exposes `getHudState()`; `UIScene` runs in parallel and polls it every frame. `systems/input.ts` turns keyboard + pointer into one snapshot read per update. `systems/audioManager.ts` synthesizes SFX with WebAudio; the SDK unlocks the AudioContext on the first gesture and `main.ts` routes the platform mute to it. Persistent data (high scores, unlocks) goes through `sdk.storage`.
+`main.ts` boots Phaser with the `SCENES` registry, wires the platform SDK (ready/error handshake, pause/restart/mute, container resize) and never changes. `BootScene` loads every texture declared in `data/assets.ts` and hands off to `GameScene`. `GameScene` owns gameplay and exposes `getHudState()`; `UIScene` runs in parallel and polls it every frame. Keyboard and pointer input is handled by Phaser event handlers in `UIScene` and `systems/TowerPlacementSystem.ts`. `systems/audioManager.ts` synthesizes SFX with WebAudio; the SDK unlocks the AudioContext on the first gesture and `main.ts` routes the platform mute to it. Persistent data (high scores, unlocks) goes through `sdk.storage`.
 
 ## How to grow this game
 
-1. **First playable**: replace the placeholder visuals inside `GameScene` — a moving thing, an objective, a fail state. Read `this.controls.getSnapshot()` in `update()` for input. Keep it small.
+1. **First playable**: replace the placeholder visuals inside `GameScene` — a moving thing, an objective, a fail state. Wire input with Phaser keyboard/pointer handlers. Keep it small.
 2. **Extract early**: before `GameScene` reaches ~200 lines, move game objects to `src/entities/` and rules to `src/systems/`. GameScene should orchestrate, not implement.
 3. **Content as data**: when a second level/enemy/wave appears, define it in `src/data/` and build it from data instead of duplicating code.
 4. **Frame the run**: add `MainMenuScene` / `GameOverScene` in `scenes/`, register them in `scenes/index.ts`, update `RESTART_SCENE_KEY`.

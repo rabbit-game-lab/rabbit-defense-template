@@ -1,6 +1,33 @@
 export const uiConfig = {
   panelColor: 0x1f2b20,
   textColor: '#fff4cf',
+  /**
+   * What: Named text colors, grouped by the meaning they carry rather than by hue.
+   * Feel: Roles that mean different things stay separate entries even when they
+   *       currently share a value, so one can be retuned without dragging the
+   *       others with it.
+   * Range: any CSS hex string.
+   * Related: panelColor and textColor above; world.accentColor for shapes.
+   * Units: CSS hex strings (Phaser text styles take strings, not 0x numbers).
+   */
+  colors: {
+    accentText: '#ffd56a',
+    positive: '#bde88f',
+    danger: '#ffaaa0',
+    hint: '#a9c49c',
+    subtitle: '#c8d8b6',
+    coinPop: '#ffe08a',
+    bossWarning: '#ffcf8b',
+    bossWarningBackground: '#3a1608',
+    victoryLabel: '#d8f5a2',
+    placementValid: '#d9ffd8',
+    placementInvalid: '#ffd0ca',
+    placementBadgeBackground: '#172219',
+    enemyLabel: '#f7d89f',
+    enemyLabelBackground: '#3a1608',
+    badgeBackground: '#111827',
+    loadingText: '#ffffff',
+  },
   // What: Global UI dimensions shared across reusable components.
   // Feel: Keep all interactive controls at or above touch-target minimum.
   // Range: 44..140px for typical buttons.

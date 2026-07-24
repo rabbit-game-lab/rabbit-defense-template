@@ -20,10 +20,6 @@ export function isRunActive(state: RunState): boolean {
   return state.status === 'running'
 }
 
-export function getRunStatus(state: RunState): RunStatus {
-  return state.status
-}
-
 export function finishRun(state: RunState, outcome: RunOutcome, now: number): RunTransition {
   if (state.status !== 'running') {
     return { state, didTransition: false }

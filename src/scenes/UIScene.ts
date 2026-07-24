@@ -1,31 +1,13 @@
 import Phaser from 'phaser'
 import { CONFIG } from '../game.config'
-import { SHOP_TOWER_ORDER, type TowerType } from '../data/towerDefense'
 import { createSceneButton, type SceneButtonHandle } from '../ui/createSceneButton'
 import { PauseMenuController, type PauseOverlayMarker } from '../ui/PauseMenuController'
 import { ResultPanelController } from '../ui/ResultPanelController'
 import { createPortraitOrientationGate } from '../ui/createPortraitOrientationGate'
+import { GameplayFocusController, type GameSceneBridge } from '../ui/GameplayFocusController'
 import { GAME_SCENE_KEY, MAIN_MENU_SCENE_KEY } from './flowContracts'
 import type { HudState } from './GameScene'
 import { isReducedEffectsEnabled } from '../systems/accessibilitySettingsStore'
-
-type FocusRegion = 'shop' | 'terrain' | 'towers' | 'actions' | 'pause'
-
-interface GameSceneBridge {
-  getHudState(): HudState
-  upgradeSelectedTower(): boolean
-  sellSelectedTower(): boolean
-  cycleSelectedTowerTargetMode(step?: number): boolean
-  toggleGameSpeed(): number
-  skipOnboarding(): void
-  setUiBlocked(blocked: boolean): void
-  beginPlacement(type: TowerType): boolean
-  cancelPlacement(): boolean
-  movePlacementCursor(dx: number, dy: number): unknown
-  confirmPlacementAtCursor(): boolean
-  selectTower(towerId: string): boolean
-  focusShopCard(index: number): void
-}
 
 export default class UIScene extends Phaser.Scene {
   private statsLine!: Phaser.GameObjects.Text
@@ -45,16 +27,11 @@ export default class UIScene extends Phaser.Scene {
   private pauseButton!: SceneButtonHandle
   private resultPanel!: ResultPanelController
   private pauseMenuController!: PauseMenuController
+  private focus!: GameplayFocusController
   private modalSources = new Set<string>()
   private sellConfirmationUntil = 0
   private sellConfirmationTowerId = ''
   private lastSelectedTowerId = ''
-  private shopIndex = 0
-  private towerIndex = 0
-  private actionIndex = 0
-  private activeRegion: FocusRegion = 'shop'
-  private focusBeforeModal: FocusRegion = 'shop'
-  private keyboardHintsVisible = false
   private previousCoins?: number
   private previousLives?: number
   private changeHideAt = 0
@@ -95,13 +72,30 @@ export default class UIScene extends Phaser.Scene {
       canResumeFromOrientationGate: () => !this.pauseMenuController.isModalOpen(),
       setUiBlocked: (blocked) => this.setModalSource('orientation', blocked),
     }, (active) => this.setOverlayMarker(active ? 'orientation' : null))
-    this.input.keyboard?.on('keydown', this.onGameplayKey)
-    this.input.on('pointerdown', this.onPointerInput)
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.input.keyboard?.off('keydown', this.onGameplayKey)
-      this.input.off('pointerdown', this.onPointerInput)
+    this.focus = new GameplayFocusController({
+      getGameScene: () => this.getGameScene(),
+      isModalOpen: () => this.modalSources.size > 0,
+      forwardToModal: (event) => this.pauseMenuController.handleKeyboardEvent(event),
+      requestSell: () => this.handleSell(),
+      clearSellConfirmation: () => {
+        if (!this.sellConfirmationTowerId) return false
+        this.sellConfirmationTowerId = ''
+        return true
+      },
+      buttons: () => ({
+        upgrade: this.upgradeButton,
+        sell: this.sellButton,
+        target: this.targetButton,
+        pause: this.pauseButton,
+      }),
     })
-    this.applyRegionFocus()
+    this.input.keyboard?.on('keydown', this.focus.handleKey)
+    this.input.on('pointerdown', this.focus.handlePointerInput)
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', this.focus.handleKey)
+      this.input.off('pointerdown', this.focus.handlePointerInput)
+    })
+    this.focus.applyFocus()
   }
 
   update(): void {
@@ -109,7 +103,7 @@ export default class UIScene extends Phaser.Scene {
     if (!game) return
     const hud = game.getHudState()
     this.pauseMenuController.setEnabled(!hud.result)
-    this.reconcileFocus(hud)
+    this.focus.reconcile(hud)
     this.renderTopHud(hud)
     this.renderSelection(hud)
     this.renderOnboarding(hud)
@@ -122,15 +116,15 @@ export default class UIScene extends Phaser.Scene {
     this.add.rectangle(hud.topRowX, hud.topRowY + hud.topRowHeight / 2, hud.topRowWidth, hud.topRowHeight, CONFIG.ui.panelColor, 0.94)
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.45)
     this.statsLine = this.add.text(18, hud.topRowY + 8, '', { fontSize: '16px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
-    this.changeLine = this.add.text(18, hud.topRowY + 32, '', { fontSize: '12px', color: '#bde88f', fontStyle: 'bold' })
+    this.changeLine = this.add.text(18, hud.topRowY + 32, '', { fontSize: '12px', color: CONFIG.ui.colors.positive, fontStyle: 'bold' })
     this.waveLine = this.add.text(250, hud.topRowY + 9, '', { fontSize: '15px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
     const bottomTop = hud.bottomY - hud.bottomHeight / 2
     this.add.rectangle(CONFIG.screen.width / 2, hud.bottomY, hud.bottomWidth, hud.bottomHeight, CONFIG.ui.panelColor, 0.94)
       .setStrokeStyle(1, CONFIG.world.accentColor, 0.4)
-    this.selectedLine = this.add.text(hud.selectedTextX, bottomTop + hud.selectedLineY, '', { fontSize: hud.selectedFontSize, color: '#ffd56a', fontStyle: 'bold' })
+    this.selectedLine = this.add.text(hud.selectedTextX, bottomTop + hud.selectedLineY, '', { fontSize: hud.selectedFontSize, color: CONFIG.ui.colors.accentText, fontStyle: 'bold' })
     this.statusLine = this.add.text(hud.statusTextX, bottomTop + hud.statusLineY, '', { fontSize: hud.statusFontSize, color: CONFIG.ui.textColor })
-    this.previewLine = this.add.text(hud.statusTextX, bottomTop + hud.previewLineY, '', { fontSize: hud.previewFontSize, color: '#ffd56a' })
-    this.keyboardHintLine = this.add.text(18, bottomTop + 49, '', { fontSize: '10px', color: '#a9c49c', fontStyle: 'bold' }).setVisible(false)
+    this.previewLine = this.add.text(hud.statusTextX, bottomTop + hud.previewLineY, '', { fontSize: hud.previewFontSize, color: CONFIG.ui.colors.accentText })
+    this.keyboardHintLine = this.add.text(18, bottomTop + 49, '', { fontSize: '10px', color: CONFIG.ui.colors.hint, fontStyle: 'bold' }).setVisible(false)
   }
 
   private createActions(): void {
@@ -165,12 +159,12 @@ export default class UIScene extends Phaser.Scene {
       : hud.wavePhase === 'active' ? `${hud.enemiesToSpawn + hud.activeEnemies} left`
         : hud.wavePhase === 'complete' ? 'All clear' : `Starts in ${seconds}s`
     this.waveLine.setText(bossWarning ? `Raid ${hud.wave}/${hud.totalWaves} · BOSS IN ${seconds}` : `Raid ${hud.wave}/${hud.totalWaves} · ${detail}`)
-      .setColor(bossWarning ? '#ffaaa0' : CONFIG.ui.textColor)
+      .setColor(bossWarning ? CONFIG.ui.colors.danger : CONFIG.ui.textColor)
     const coinDelta = this.previousCoins === undefined ? 0 : hud.coins - this.previousCoins
     const hpDelta = this.previousLives === undefined ? 0 : hud.lives - this.previousLives
     if ((coinDelta || hpDelta) && !isReducedEffectsEnabled()) {
       this.changeLine.setText(coinDelta ? `${coinDelta > 0 ? '+' : ''}${coinDelta} Ryo` : `${hpDelta} Dojo HP`)
-        .setColor(hpDelta < 0 ? '#ffaaa0' : '#bde88f').setVisible(true)
+        .setColor(hpDelta < 0 ? CONFIG.ui.colors.danger : CONFIG.ui.colors.positive).setVisible(true)
       this.changeHideAt = this.time.now + CONFIG.ui.status.changeFeedbackMs
     } else if (this.time.now >= this.changeHideAt) this.changeLine.setVisible(false)
     this.previousCoins = hud.coins
@@ -218,14 +212,15 @@ export default class UIScene extends Phaser.Scene {
   }
 
   private renderKeyboardHint(hud: HudState): void {
-    if (!this.keyboardHintsVisible || this.modalSources.size > 0) {
+    if (!this.focus.keyboardHintsVisible || this.modalSources.size > 0) {
       this.keyboardHintLine.setVisible(false)
       return
     }
-    const hint = this.activeRegion === 'shop' ? 'Shop: 1–3 or [ ] · Enter choose · F speed'
-      : this.activeRegion === 'terrain' ? 'Terrain: arrows move · Enter place · Esc cancel'
-        : this.activeRegion === 'towers' ? 'Defenses: arrows cycle · Tab actions'
-          : this.activeRegion === 'actions' ? 'Actions: arrows cycle · U upgrade · S sell · T target'
+    const region = this.focus.activeRegion
+    const hint = region === 'shop' ? 'Shop: 1–3 or [ ] · Enter choose · F speed'
+      : region === 'terrain' ? 'Terrain: arrows move · Enter place · Esc cancel'
+        : region === 'towers' ? 'Defenses: arrows cycle · Tab actions'
+          : region === 'actions' ? 'Actions: arrows cycle · U upgrade · S sell · T target'
             : 'Pause: Enter · P pause · M mute'
     this.keyboardHintLine.setText(`${hint} · Tab regions${hud.placement.pendingTowerType ? '' : ''}`).setVisible(true)
   }
@@ -243,117 +238,6 @@ export default class UIScene extends Phaser.Scene {
     this.sellConfirmationUntil = this.time.now + CONFIG.ui.status.sellConfirmMs
   }
 
-  private readonly onGameplayKey = (event: KeyboardEvent): void => {
-    this.keyboardHintsVisible = true
-    if (this.modalSources.size > 0) {
-      this.pauseMenuController.handleKeyboardEvent(event)
-      return
-    }
-    const game = this.getGameScene()
-    if (!game) return
-    const hud = game.getHudState()
-    if (event.key === 'Escape') {
-      if (this.sellConfirmationTowerId) { this.sellConfirmationTowerId = ''; return }
-      if (game.cancelPlacement()) return
-      this.pauseMenuController.handleKeyboardEvent(event)
-      return
-    }
-    if (event.key.toLowerCase() === 'p' || event.key.toLowerCase() === 'm') {
-      this.pauseMenuController.handleKeyboardEvent(event)
-      return
-    }
-    if (/^[123]$/.test(event.key)) {
-      this.shopIndex = Number(event.key) - 1
-      this.activeRegion = 'shop'
-      game.beginPlacement(SHOP_TOWER_ORDER[this.shopIndex])
-      this.applyRegionFocus()
-      return
-    }
-    if (event.key === '[' || event.key === ']') {
-      this.shopIndex = (this.shopIndex + (event.key === '[' ? -1 : 1) + SHOP_TOWER_ORDER.length) % SHOP_TOWER_ORDER.length
-      this.activeRegion = 'shop'
-      game.beginPlacement(SHOP_TOWER_ORDER[this.shopIndex])
-      this.applyRegionFocus()
-      return
-    }
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      this.cycleRegion(event.shiftKey ? -1 : 1, hud)
-      return
-    }
-    if (event.key.startsWith('Arrow')) {
-      event.preventDefault()
-      this.handleArrow(event.key, hud)
-      return
-    }
-    if (event.key.toLowerCase() === 'u') { game.upgradeSelectedTower(); return }
-    if (event.key.toLowerCase() === 's') { this.handleSell(); return }
-    if (event.key.toLowerCase() === 't') { game.cycleSelectedTowerTargetMode(); return }
-    if (event.key.toLowerCase() === 'f') { game.toggleGameSpeed(); return }
-    if (event.key !== 'Enter' && event.key !== ' ') return
-    if (this.activeRegion === 'shop') game.beginPlacement(SHOP_TOWER_ORDER[this.shopIndex])
-    else if (this.activeRegion === 'terrain') game.confirmPlacementAtCursor()
-    else if (this.activeRegion === 'towers') game.selectTower(hud.placement.towerIds[this.towerIndex] ?? '')
-    else if (this.activeRegion === 'actions') this.activateFocusedAction(game)
-  }
-
-  private activateFocusedAction(game: Phaser.Scene & GameSceneBridge): void {
-    if (this.actionIndex === 0) game.upgradeSelectedTower()
-    else if (this.actionIndex === 1) this.handleSell()
-    else game.cycleSelectedTowerTargetMode()
-  }
-
-  private handleArrow(key: string, hud: HudState): void {
-    const game = this.getGameScene()
-    if (!game) return
-    if (this.activeRegion === 'terrain') {
-      game.movePlacementCursor(key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0, key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0)
-      return
-    }
-    const step = key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 1
-    if (this.activeRegion === 'shop') {
-      this.shopIndex = (this.shopIndex + step + SHOP_TOWER_ORDER.length) % SHOP_TOWER_ORDER.length
-    } else if (this.activeRegion === 'towers' && hud.placement.towerIds.length) {
-      this.towerIndex = (this.towerIndex + step + hud.placement.towerIds.length) % hud.placement.towerIds.length
-      game.selectTower(hud.placement.towerIds[this.towerIndex])
-    } else if (this.activeRegion === 'actions') {
-      this.actionIndex = (this.actionIndex + step + 3) % 3
-    }
-    this.applyRegionFocus()
-  }
-
-  private cycleRegion(step: number, hud: HudState): void {
-    const available: FocusRegion[] = ['shop', 'terrain']
-    if (hud.placement.towerIds.length) available.push('towers')
-    if (hud.selectedTower) available.push('actions')
-    available.push('pause')
-    const index = Math.max(0, available.indexOf(this.activeRegion))
-    this.activeRegion = available[(index + step + available.length) % available.length]
-    if (this.activeRegion === 'towers') this.getGameScene()?.selectTower(hud.placement.towerIds[this.towerIndex] ?? '')
-    this.applyRegionFocus()
-  }
-
-  private applyRegionFocus(): void {
-    this.getGameScene()?.focusShopCard(this.activeRegion === 'shop' ? this.shopIndex : -1)
-    this.upgradeButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 0)
-    this.sellButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 1)
-    this.targetButton?.setKeyboardFocus(this.activeRegion === 'actions' && this.actionIndex === 2)
-    this.pauseButton?.setKeyboardFocus(this.activeRegion === 'pause')
-  }
-
-  private reconcileFocus(hud: HudState): void {
-    this.towerIndex = Math.min(this.towerIndex, Math.max(0, hud.placement.towerIds.length - 1))
-    if ((this.activeRegion === 'towers' && !hud.placement.towerIds.length) || (this.activeRegion === 'actions' && !hud.selectedTower)) {
-      this.activeRegion = hud.placement.pendingTowerType ? 'terrain' : 'shop'
-      this.applyRegionFocus()
-    }
-  }
-
-  private readonly onPointerInput = (): void => {
-    this.keyboardHintsVisible = false
-    this.applyRegionFocus()
-  }
-
   private restartRun(): void {
     window.setTimeout(() => {
       const manager = this.game.scene
@@ -368,14 +252,11 @@ export default class UIScene extends Phaser.Scene {
 
   private setModalSource(source: string, active: boolean): void {
     if (active) {
-      if (this.modalSources.size === 0) this.focusBeforeModal = this.activeRegion
+      if (this.modalSources.size === 0) this.focus?.rememberRegionBeforeModal()
       this.modalSources.add(source)
     } else {
       this.modalSources.delete(source)
-      if (this.modalSources.size === 0) {
-        this.activeRegion = this.focusBeforeModal
-        this.applyRegionFocus()
-      }
+      if (this.modalSources.size === 0) this.focus?.restoreRegionAfterModal()
     }
     this.getGameScene()?.setUiBlocked(this.modalSources.size > 0)
   }

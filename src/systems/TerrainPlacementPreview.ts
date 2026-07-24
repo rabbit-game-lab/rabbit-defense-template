@@ -19,9 +19,9 @@ export class TerrainPlacementPreview {
     this.cell = scene.add.rectangle(0, 0, CONFIG.placement.cellSize, CONFIG.placement.cellSize, 0x7bd879, CONFIG.placement.previewFillAlpha)
     this.icon = scene.add.text(13, -14, '✓', {
       fontSize: '14px',
-      color: '#d9ffd8',
+      color: CONFIG.ui.colors.placementValid,
       fontStyle: 'bold',
-      backgroundColor: '#172219',
+      backgroundColor: CONFIG.ui.colors.placementBadgeBackground,
       padding: { x: 2, y: 0 },
     }).setOrigin(0.5)
     this.ghost = scene.add.image(0, 0, TOWER_TEXTURE_KEYS.arrow).setAlpha(0.72)
@@ -38,7 +38,7 @@ export class TerrainPlacementPreview {
       .setFillStyle(color, CONFIG.placement.previewFillAlpha)
       .setStrokeStyle(CONFIG.placement.previewStrokePx, color, 0.92)
     this.ghost.setTexture(TOWER_TEXTURE_KEYS[type]).setTint(valid ? 0xffffff : 0xd77f7a)
-    this.icon.setText(valid ? '✓' : '!').setColor(valid ? '#d9ffd8' : '#ffd0ca')
+    this.icon.setText(valid ? '✓' : '!').setColor(valid ? CONFIG.ui.colors.placementValid : CONFIG.ui.colors.placementInvalid)
   }
 
   hide(): void {

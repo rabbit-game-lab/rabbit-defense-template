@@ -173,10 +173,6 @@ export function applyRunResultToProfile(profile: ProfileRecord, result: RunResul
     next.defeats += 1
   }
 
-  if (result.wavesCleared > profile.wins + profile.defeats) {
-    // no-op placeholder branch kept for future richer metrics (not persisted today)
-  }
-
   return next
 }
 
@@ -190,9 +186,3 @@ export function ensureOnboardingComplete(profile: ProfileRecord, complete = true
   return { ...profile, onboardingCompleted: complete }
 }
 
-export function mergeProfileRecord(next: ProfileRecord, previous: ProfileRecord): ProfileRecord {
-  if (next.schemaVersion > previous.schemaVersion) {
-    return next
-  }
-  return { ...previous, ...next, schemaVersion: PROFILE_SCHEMA_VERSION }
-}

@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ENEMY_TEXTURE_KEYS } from '../data/assets'
 import type { EnemyDefinition, EnemyType } from '../data/towerDefense'
+import { CONFIG } from '../game.config'
 
 export interface EnemyRuntime {
   id: string
@@ -38,10 +39,10 @@ export class EnemyView {
     const hpBack = scene.add.rectangle(0, hpY, hpWidth, 4, 0x1b1b1b).setOrigin(0.5)
     this.hpFill = scene.add.rectangle(-definition.radius, hpY, hpWidth, 4, 0xd84a3a).setOrigin(0, 0.5)
     const bossLabel = scene.add.text(0, definition.radius + 14, 'SHOGUN', {
-      color: '#f7d89f',
+      color: CONFIG.ui.colors.enemyLabel,
       fontFamily: 'monospace',
       fontSize: '8px',
-      backgroundColor: '#3a1608',
+      backgroundColor: CONFIG.ui.colors.enemyLabelBackground,
       padding: { x: 3, y: 1 },
     }).setOrigin(0.5).setVisible(isBoss)
 

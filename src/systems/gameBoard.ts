@@ -19,16 +19,16 @@ export function createBattleBackground(scene: Phaser.Scene): void {
 export function createHeader(scene: Phaser.Scene): void {
   scene.add.rectangle(184, 82, 338, 54, CONFIG.ui.panelColor, 0.72).setStrokeStyle(1, CONFIG.world.accentColor, 0.22)
   scene.add.text(26, 62, 'Hidden Dojo Defense', { fontSize: '24px', color: CONFIG.ui.textColor, fontStyle: 'bold' })
-  scene.add.text(28, 90, 'Protect the hidden dojo from rival ninja clans.', { fontSize: '12px', color: '#c8d8b6' })
+  scene.add.text(28, 90, 'Protect the hidden dojo from rival ninja clans.', { fontSize: '12px', color: CONFIG.ui.colors.subtitle })
 }
 
 export function drawPath(scene: Phaser.Scene): void {
   scene.add.image(760, 168, 'hidden-dojo').setScale(2).setDepth(1)
   scene.add.text(760, 211, 'HIDDEN DOJO', {
     fontSize: '10px',
-    color: '#fff4cf',
+    color: CONFIG.ui.textColor,
     fontStyle: 'bold',
-    backgroundColor: '#111827',
+    backgroundColor: CONFIG.ui.colors.badgeBackground,
     padding: { x: 5, y: 2 },
   }).setOrigin(0.5).setDepth(2)
 }
@@ -80,7 +80,7 @@ export function buildCards(scene: Phaser.Scene, onStartDrag: (type: TowerType, p
     }).setOrigin(0.5, 0)
     const costText = scene.add.text(0, 14, `${tower.cost} ryo`, {
       fontSize: shopCfg.cardCostFontSize,
-      color: '#ffd56a',
+      color: CONFIG.ui.colors.accentText,
       fontStyle: 'bold',
     }).setOrigin(0.5, 0)
 

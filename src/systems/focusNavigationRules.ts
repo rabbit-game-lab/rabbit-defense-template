@@ -1,26 +1,9 @@
-import type { TerrainCell } from '../data/terrain.js'
-import { CONFIG } from '../game.config.js'
-import { snapToTerrainCell, terrainCellId } from './terrainPlacementRules.js'
-
 export type GameplayFocusRegion = 'shop' | 'terrain' | 'towers' | 'actions' | 'pause'
 
 export interface GameplayFocusTarget {
   readonly id: string
   readonly region: GameplayFocusRegion
   readonly enabled: boolean
-}
-
-export function createTerrainFocusTarget(cell: TerrainCell): GameplayFocusTarget {
-  // Placement validity deliberately does not affect focusability: rejection feedback
-  // must remain available to keyboard-only players.
-  return { id: terrainCellId(cell), region: 'terrain', enabled: true }
-}
-
-export function moveTerrainFocus(cell: TerrainCell, dx: number, dy: number): TerrainCell {
-  return snapToTerrainCell(
-    cell.x + Math.sign(dx) * CONFIG.placement.cellSize,
-    cell.y + Math.sign(dy) * CONFIG.placement.cellSize,
-  )
 }
 
 export function cycleFocusTarget(
