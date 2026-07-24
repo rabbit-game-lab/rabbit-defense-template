@@ -1,5 +1,7 @@
 import { audioConfig } from './config/audio.config.js'
 import { combatConfig } from './config/combat.config.js'
+import { effectsConfig } from './config/effects.config.js'
+import { placementConfig } from './config/placement.config.js'
 import { renderConfig } from './config/render.config.js'
 import { runConfig } from './config/run.config.js'
 import { screenConfig } from './config/screen.config.js'
@@ -15,7 +17,9 @@ export const CONFIG = {
   ui: uiConfig,
   waves: waveConfig,
   combat: combatConfig,
+  effects: effectsConfig,
+  placement: placementConfig,
   audio: audioConfig,
 } as const
 
-export type { AudioConfig, CombatConfig, RenderConfig, RunConfig, ScreenConfig, UiConfig, WaveConfig, WorldConfig } from './config/index.js'
+export type { AudioConfig, CombatConfig, EffectsConfig, PlacementConfig, RenderConfig, RunConfig, ScreenConfig, UiConfig, WaveConfig, WorldConfig } from './config/index.js'

@@ -50,7 +50,8 @@ export const PATH: readonly Point[] = [
   { x: 824, y: 190 },
 ]
 
-export const BUILD_SPOTS: readonly Point[] = [
+/** Simulator-only anchors retained verbatim so balance baselines do not change. */
+export const SIMULATOR_BUILD_SITES: readonly Point[] = [
   { x: 90, y: 140 },
   { x: 220, y: 178 },
   { x: 238, y: 292 },
@@ -86,7 +87,7 @@ export const TOWERS: Record<TowerType, TowerDefinition> = {
     projectileSpeed: 360,
     color: 0x385b83,
     topColor: 0xa9e8ff,
-    description: 'Slows raiders with frozen seals.',
+    description: 'Slows raiders with frozen rings.',
     slowFactor: 0.55,
     slowMs: 1200,
     upgradeCost: 55,

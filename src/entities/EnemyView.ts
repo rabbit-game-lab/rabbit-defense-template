@@ -34,9 +34,6 @@ export class EnemyView {
     const hpY = -definition.radius - 8
     const hpWidth = definition.radius * 2
 
-    const bossHalo = scene.add.ellipse(0, 2, definition.radius * 2.9, definition.radius * 2.4, 0xf4cf6e, isBoss ? 0.45 : 0)
-    bossHalo.setVisible(isBoss)
-
     this.sprite = scene.add.image(0, 0, ENEMY_TEXTURE_KEYS[definition.type]).setScale(spriteScale)
     const hpBack = scene.add.rectangle(0, hpY, hpWidth, 4, 0x1b1b1b).setOrigin(0.5)
     this.hpFill = scene.add.rectangle(-definition.radius, hpY, hpWidth, 4, 0xd84a3a).setOrigin(0, 0.5)
@@ -48,7 +45,7 @@ export class EnemyView {
       padding: { x: 3, y: 1 },
     }).setOrigin(0.5).setVisible(isBoss)
 
-    this.container.add([bossHalo, this.sprite, hpBack, this.hpFill, bossLabel])
+    this.container.add([this.sprite, hpBack, this.hpFill, bossLabel])
   }
 
   setPosition(x: number, y: number): void {

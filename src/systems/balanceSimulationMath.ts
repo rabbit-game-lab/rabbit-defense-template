@@ -1,5 +1,5 @@
 import { CONFIG } from '../game.config.js'
-import { PATH, BUILD_SPOTS, TOWERS, ENEMIES, WAVES, type TowerType, type EnemyType } from '../data/towerDefense.js'
+import { PATH, SIMULATOR_BUILD_SITES, TOWERS, ENEMIES, WAVES, type TowerType, type EnemyType } from '../data/towerDefense.js'
 import { chooseTowerTarget, computeTowerUpgrade, damageEnemy, advanceEnemyAlongPath, distanceBetween } from './towerDefenseRules.js'
 import { createWaveState, prepareFirstWaveForCombat, nextEnemyToSpawn, markEnemySpawned, waveProgressSnapshot, makeEnemyStats } from './waves.js'
 import { type SimWaveMetrics, type StrategyContext, type StrategyAction, type TowerRuntimeSummary } from './balanceTypes.js'
@@ -77,7 +77,7 @@ export function createSimulationState(): SimState {
     coins: CONFIG.run.startingCoins,
     lives: CONFIG.run.startingLives,
     started: false,
-    pads: Array(BUILD_SPOTS.length).fill(undefined),
+    pads: Array(SIMULATOR_BUILD_SITES.length).fill(undefined),
     towers: [],
     enemies: [],
     projectiles: [],
@@ -139,15 +139,15 @@ export function towerSummary(tower: TowerRuntime): TowerRuntimeSummary {
 
 export function createTower(state: SimState, type: TowerType, padIndex: number): void {
   const definition = TOWERS[type]
-  if (padIndex < 0 || padIndex >= BUILD_SPOTS.length || state.pads[padIndex] !== undefined) return
-  if (state.coins < definition.cost || state.towers.length >= BUILD_SPOTS.length) return
+  if (padIndex < 0 || padIndex >= SIMULATOR_BUILD_SITES.length || state.pads[padIndex] !== undefined) return
+  if (state.coins < definition.cost || state.towers.length >= SIMULATOR_BUILD_SITES.length) return
 
   const id = `${type}-${state.towerCounter++}`
   state.towers.push({
     id,
     type,
-    x: BUILD_SPOTS[padIndex].x,
-    y: BUILD_SPOTS[padIndex].y,
+    x: SIMULATOR_BUILD_SITES[padIndex].x,
+    y: SIMULATOR_BUILD_SITES[padIndex].y,
     level: 1,
     damage: definition.damage,
     range: definition.range,
@@ -326,4 +326,3 @@ export function buildContext(state: SimState, progress: ReturnType<typeof wavePr
 }
 
 export { waveProgressSnapshot }
-

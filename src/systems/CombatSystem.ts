@@ -14,9 +14,10 @@ import {
   waveProgressSnapshot,
   type WaveProgressSnapshot,
 } from './waves'
-import { playDefeatSfx, playLeakSfx, playShotSfx } from './audioManager'
+import { playBossArrivalSfx, playDefeatSfx, playLeakSfx, playShotSfx } from './audioManager'
 import type { TowerRuntime } from '../entities/TowerView'
 import type { FeedbackLane } from './hudRules'
+import { EffectsSystem } from './EffectsSystem'
 
 interface CombatCallbacks {
   onCoinsGain: (amount: number) => void
@@ -27,6 +28,7 @@ interface CombatCallbacks {
 }
 
 export default class CombatSystem {
+  readonly effects: EffectsSystem
   private readonly scene: Phaser.Scene
   private readonly callbacks: CombatCallbacks
   private enemies: EnemyRuntime[] = []
@@ -37,6 +39,7 @@ export default class CombatSystem {
   constructor(scene: Phaser.Scene, callbacks: CombatCallbacks) {
     this.scene = scene
     this.callbacks = callbacks
+    this.effects = new EffectsSystem(scene)
     this.waveState = createWaveState(this.scene.time.now, CONFIG.waves.betweenWaveDelayMs, CONFIG.waves.firstWavePrepareDelayMs)
   }
 
@@ -65,6 +68,7 @@ export default class CombatSystem {
   }
 
   update(delta: number, towers: readonly TowerRuntime[]): void {
+    this.effects.update()
     const now = this.scene.time.now
     this.spawnEnemies(now)
     if (!this.updateEnemies(delta, now)) return
@@ -77,6 +81,7 @@ export default class CombatSystem {
     for (const projectile of this.projectiles) projectile.sprite.destroy()
     this.enemies = []
     this.projectiles = []
+    this.effects.destroy()
   }
 
   private spawnEnemies(now: number): void {
@@ -99,6 +104,10 @@ export default class CombatSystem {
       escaped: false,
       view,
     })
+    if (type === 'warden') {
+      this.effects.showBossArrival(start.x, start.y)
+      playBossArrivalSfx()
+    }
     markEnemySpawned(this.waveState, now)
   }
 
@@ -123,7 +132,7 @@ export default class CombatSystem {
       if (!target) continue
 
       tower.nextShotAt = now + tower.fireRateMs
-      tower.view.pulse(this.scene)
+      this.effects.pulseTower(tower.view)
       this.projectiles.push({
         sprite: createProjectile(this.scene, tower.x, tower.y - 8, tower.type),
         target,
@@ -134,7 +143,7 @@ export default class CombatSystem {
         slowMs: tower.slowMs,
         splashRadius: tower.splashRadius,
       })
-      playShotSfx()
+      playShotSfx(tower.type)
     }
   }
 
@@ -149,6 +158,14 @@ export default class CombatSystem {
       const angle = Phaser.Math.Angle.Between(projectile.sprite.x, projectile.sprite.y, projectile.target.x, projectile.target.y)
       projectile.sprite.x += Math.cos(angle) * step
       projectile.sprite.y += Math.sin(angle) * step
+      projectile.sprite.setRotation(angle)
+      projectile.lastTrailAt = this.effects.sampleProjectile(
+        projectile.sprite.x,
+        projectile.sprite.y,
+        projectile.type,
+        now,
+        projectile.lastTrailAt,
+      )
 
       if (distanceBetween(projectile.sprite, projectile.target) <= CONFIG.combat.projectileHitRadiusPx) {
         this.hitEnemy(projectile, now)
@@ -157,6 +174,7 @@ export default class CombatSystem {
   }
 
   private hitEnemy(projectile: ProjectileRuntime, now: number): void {
+    this.effects.showImpact(projectile.target.x, projectile.target.y, projectile.type, projectile.splashRadius)
     const victims = projectile.splashRadius
       ? this.enemies.filter((enemy) => distanceBetween(enemy, projectile.target) <= projectile.splashRadius!)
       : [projectile.target]

@@ -30,6 +30,7 @@ export class TowerView {
   private readonly levelText: Phaser.GameObjects.Text
   private readonly rangeCircle: Phaser.GameObjects.Arc
   private readonly selectionRing: Phaser.GameObjects.Arc
+  private pulseTween?: Phaser.Tweens.Tween
 
   constructor(scene: Phaser.Scene, definition: TowerDefinition, x: number, y: number) {
     this.container = scene.add.container(x, y)
@@ -56,6 +57,7 @@ export class TowerView {
   }
 
   setLevel(level: number): void {
+    this.cancelPulse()
     this.levelText.setText(String(level))
     const scale = computeTowerLevelScale(level)
     this.sprite.setScale(scale)
@@ -66,11 +68,31 @@ export class TowerView {
     this.rangeCircle.setRadius(range)
   }
 
-  pulse(scene: Phaser.Scene): void {
-    scene.tweens.add({ targets: this.sprite, scale: this.sprite.scale * 1.12, duration: 80, yoyo: true })
+  pulse(scene: Phaser.Scene, duration = 80): void {
+    this.cancelPulse()
+    const restingScale = this.sprite.scaleX
+    this.pulseTween = scene.tweens.add({
+      targets: this.sprite,
+      scale: restingScale * 1.12,
+      duration,
+      yoyo: true,
+      onComplete: () => {
+        this.sprite.setScale(restingScale)
+        this.pulseTween = undefined
+      },
+    })
+  }
+
+  cancelPulse(): void {
+    if (!this.pulseTween) return
+    const restingScale = this.levelText.scaleX
+    this.pulseTween.stop()
+    this.sprite.setScale(restingScale)
+    this.pulseTween = undefined
   }
 
   destroy(): void {
+    this.cancelPulse()
     this.container.destroy()
   }
 }
