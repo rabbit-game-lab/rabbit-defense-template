@@ -70,3 +70,7 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 ## SDK 0.8 integration
 
 Read [docs/rabbit-sdk.md](docs/rabbit-sdk.md) for shared lifecycle, required/optional assets, pointer lock and character switching. `.rabbit-kit.json` records the exact source commit and file hashes. Run `rabbit-kit status --check` from a matching kit checkout; `npm run check` also checks the recorded integrity. Do not edit vendored files or their receipt.
+
+## Switching the playable character
+
+Keep one adapter from `createCharacter(existingSprite)` and switch the visual through its handle: `await hero.switchCharacter('loaded-texture-key')` uses an already-loaded Phaser texture; `{ key: 'visitor', path: '/characters/visitor.png', frameWidth: 64, frameHeight: 64 }` loads an image or spritesheet. Set frame dimensions only for spritesheets. `next.animations` maps semantic states such as `idle` and `run` to the target Phaser animation keys. External images need CORS enabled by their host. The adapter keeps the same sprite, display size, origin, Arcade body and velocity, so keep the controller and physics attached to that sprite. A failed or superseded request leaves the current character in place.
