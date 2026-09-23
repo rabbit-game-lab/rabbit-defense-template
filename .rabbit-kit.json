@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "stack": "phaser-2d",
+  "sdk": {
+    "source": {
+      "version": "0.8.0",
+      "commit": "9e3ac3c9fc304517f2105f71be38cfad1f02135a",
+      "dirty": false
+    },
+    "files": {
+      "src/rabbit/asset-source.ts": "9b0c8411148ec9e112c39c030067b2aa2f6daccd6a89e511faba22876ba16426",
+      "src/rabbit/gamepad.ts": "1a3da15653350a095c73386ccdede8fad0e08f2813b38ec00ac3f96159468c91",
+      "src/rabbit/keyboard.ts": "4a2bc415e1511d824e9562ba04c7cae43b287dca1f39aace4d1a9a211594e721",
+      "src/rabbit/pause.ts": "e9ae64a2421762f5b15433d09fc4f25782cc6f9412bd13fe1193413fb30f4ea3",
+      "src/rabbit/players.ts": "6e0869e1fef7ad90f7a8068ca1063022b8b83b4aaa1786875436c5ca8bc6cd88",
+      "src/rabbit/pointer-lock.ts": "7dcc84382530b59b7a5f88544a1a5110133297aaa10bfded8baedb22d4b79b30",
+      "src/rabbit/runtime.ts": "b947dcae9e1cb540e2075b3d441228b2f84a07a3be533a3670c4bd224087beb6",
+      "src/rabbit/sdk.ts": "ca193b6488c2a700a6b779311e7c656136f82afb454e270020b276bf0f968981",
+      "src/rabbit/sound.ts": "6f340fd1edb69edad819fe3b57cf593699cfebfbbeaf0384fb93f936436cb7d3",
+      "src/rabbit/spatial.ts": "0f9207852491cf70e1ab655194b3b953e5539a0fd331d6255b8d1d4d7a16f8bd",
+      "src/rabbit/touch.ts": "c6c9949f38c39ffc0f62df0184d6def66636efdc778127a3dff3a791266c5731",
+      "src/rabbit/assets.ts": "7d18daa29ba9ce7fdc9853af8dfd3da277166b7016daa8fa341d956c7b4e1d75",
+      "src/rabbit/character.ts": "6d5c1bfddb4eac1ebfcc137a15f8f3731189322913b1a14dd89bee95017a3215",
+      "src/rabbit/controller.ts": "2fd677870515a1ab918fff5b645b4ac0d6b4cc2226d36a4bb4a024e7e7e0b70c",
+      "src/rabbit/physics.ts": "4a9e553714895adbe8685e8521b2f2f89974b0a50f50838c18b7eb0acfa26b7b"
+    }
+  },
+  "check": {
+    "source": {
+      "version": "0.8.0",
+      "commit": "9e3ac3c9fc304517f2105f71be38cfad1f02135a",
+      "dirty": false
+    },
+    "files": {
+      "scripts/check.mjs": "e1830d125b64d631ab6353593f5397af957166fc0d8d49d21c418c0557cc07c9",
+      "scripts/profile.mjs": "705a8865160b2d88ddb805edc823f525d327087590a8d3107285755653116ba3",
+      "scripts/integrity.mjs": "3e9b2595c6482a0e3352135c2ff4edc0f682b5a99769cbde6771e634ddcd0e0c"
+    }
+  }
+}

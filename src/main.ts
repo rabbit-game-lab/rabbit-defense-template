@@ -12,6 +12,8 @@ import { CONFIG } from './game.config'
 import { setMuted } from './systems/audioManager'
 import { RESTART_SCENE_KEY, SCENES } from './scenes'
 
+sdk.init()
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: CONFIG.screen.width,
@@ -51,6 +53,7 @@ sdk.init({
       game.scene.stop(scene.scene.key)
     }
     game.scene.start(RESTART_SCENE_KEY)
+    if (sdk.runtime.state().paused) game.loop.sleep()
   },
   onMute: (muted) => {
     setMuted(muted)
@@ -71,7 +74,7 @@ game.events.once(Phaser.Core.Events.READY, () => {
   }
 })
 
-// Handshake: `rabbit:ready` after the first rendered frame.
+// Handshake waits for the first frame and every registered critical asset/boot task.
 game.events.once(Phaser.Core.Events.POST_RENDER, () => {
   sdk.ready()
 })

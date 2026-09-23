@@ -1,6 +1,6 @@
-# Rabbit 2D Base — Agent Guide
+# Rabbit Defense — Agent Guide
 
-This is a **base template**: a fully wired but empty game. The platform plumbing already works — boot, iframe SDK handshake, input snapshot, procedural audio, config-first tuning, HUD overlay — and there is **no gameplay**. Your job is to build the game on top of this wiring, never to rewire it. Built with **Phaser 3 (Arcade Physics) + Vite + TypeScript**.
+This is the **Rabbit Defense game template**, built with **Phaser 3 (Arcade Physics) + Vite + TypeScript**. Extend the existing gameplay through its scenes, entities, systems and configuration. Boot, the iframe handshake and the vendored SDK are maintained through the canonical platform workflow.
 
 ## Commands
 
@@ -66,3 +66,11 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 3. **Content as data**: when a second level/enemy/wave appears, define it in `src/data/` and build it from data instead of duplicating code.
 4. **Frame the run**: add `MainMenuScene` / `GameOverScene` in `scenes/`, register them in `scenes/index.ts`, update `RESTART_SCENE_KEY`.
 5. **Config-first, always**: every new tunable goes to `game.config.ts` with its documented block at the moment you introduce it — not later.
+
+## SDK 0.8 integration
+
+Read [docs/rabbit-sdk.md](docs/rabbit-sdk.md) for shared lifecycle, required/optional assets, pointer lock and character switching. `.rabbit-kit.json` records the exact source commit and file hashes. Run `rabbit-kit status --check` from a matching kit checkout; `npm run check` also checks the recorded integrity. Do not edit vendored files or their receipt.
+
+## Switching the playable character
+
+Keep one adapter from `createCharacter(existingSprite)` and switch the visual through its handle: `await hero.switchCharacter('loaded-texture-key')` uses an already-loaded Phaser texture; `{ key: 'visitor', path: '/characters/visitor.png', frameWidth: 64, frameHeight: 64 }` loads an image or spritesheet. Set frame dimensions only for spritesheets. `next.animations` (the second argument to `switchCharacter`) maps semantic states such as `idle` and `run` to the target Phaser animation keys. For an already-loaded texture, pass a map such as `{ animations: { idle: 'visitor-idle', run: 'visitor-run' } }`; every switch replaces the old state-to-key map. A `CharacterAsset` descriptor can create its configured animation definitions while it loads. External images need CORS enabled by their host. The adapter keeps the same sprite, display size, origin, Arcade body and velocity, so keep the controller and physics attached to that sprite. A failed or superseded request leaves the current character in place.
