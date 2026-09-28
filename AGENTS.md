@@ -67,10 +67,14 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 4. **Frame the run**: add `MainMenuScene` / `GameOverScene` in `scenes/`, register them in `scenes/index.ts`, update `RESTART_SCENE_KEY`.
 5. **Config-first, always**: every new tunable goes to `game.config.ts` with its documented block at the moment you introduce it — not later.
 
-## SDK 0.8 integration
+## SDK 1.0 integration
 
 Read [docs/rabbit-sdk.md](docs/rabbit-sdk.md) for shared lifecycle, required/optional assets, pointer lock and character switching. `.rabbit-kit.json` records the exact source commit and file hashes. Run `rabbit-kit status --check` from a matching kit checkout; `npm run check` also checks the recorded integrity. Do not edit vendored files or their receipt.
 
 ## Switching the playable character
 
 Keep one adapter from `createCharacter(existingSprite)` and switch the visual through its handle: `await hero.switchCharacter('loaded-texture-key')` uses an already-loaded Phaser texture; `{ key: 'visitor', path: '/characters/visitor.png', frameWidth: 64, frameHeight: 64 }` loads an image or spritesheet. Set frame dimensions only for spritesheets. `next.animations` (the second argument to `switchCharacter`) maps semantic states such as `idle` and `run` to the target Phaser animation keys. For an already-loaded texture, pass a map such as `{ animations: { idle: 'visitor-idle', run: 'visitor-run' } }`; every switch replaces the old state-to-key map. A `CharacterAsset` descriptor can create its configured animation definitions while it loads. External images need CORS enabled by their host. The adapter keeps the same sprite, display size, origin, Arcade body and velocity, so keep the controller and physics attached to that sprite. A failed or superseded request leaves the current character in place.
+
+## Kit 1.0.0 provenance
+
+SDK and checker are synchronized together from tag `v1.0.0` (`8bca4a8135dcd2a7b66b51f547cceba7755fdcd3`). Commit the generated `.rabbit-kit.json` with future CLI syncs; never edit vendored files or the receipt by hand. `npm run check` also inventories any GLBs under `public/`; `node scripts/models.mjs <file-or-directory> --json` provides structured inspection. Phaser spritesheet animations keep their existing manifest workflow. See [SDK integration](docs/rabbit-sdk.md).
