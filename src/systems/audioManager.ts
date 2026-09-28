@@ -2,7 +2,7 @@
  * Procedural WebAudio SFX — no audio files.
  * AudioContext unlock and mute arrive through rabbit/sdk.
  */
-import * as sdk from '../rabbit/sdk.js'
+import * as sdk from '@rabbit-game-lab/sdk'
 import type { TowerType } from '../data/towerDefense.js'
 import { CONFIG } from '../game.config.js'
 import {

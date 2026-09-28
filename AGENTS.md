@@ -1,6 +1,6 @@
 # Rabbit Defense — Agent Guide
 
-This is the **Rabbit Defense game template**, built with **Phaser 3 (Arcade Physics) + Vite + TypeScript**. Extend the existing gameplay through its scenes, entities, systems and configuration. Boot, the iframe handshake and the vendored SDK are maintained through the canonical platform workflow.
+This is the **Rabbit Defense game template**, built with **Phaser 3 (Arcade Physics) + Vite + TypeScript**. Extend the existing gameplay through its scenes, entities, systems and configuration. Boot, the iframe handshake and the npm SDK are maintained through the canonical platform workflow.
 
 ## Commands
 
@@ -17,7 +17,7 @@ rabbit.json               Platform manifest. DO NOT EDIT.
 src/
   main.ts                 Boot + SDK wiring. DO NOT EDIT.
   game.config.ts          ⭐ ALL gameplay tuning. Every tunable value lands here.
-  rabbit/sdk.ts           Platform iframe SDK (storage, audio unlock, handshake). DO NOT EDIT.
+  @rabbit-game-lab/sdk           Platform iframe SDK (storage, audio unlock, handshake). DO NOT EDIT.
   scenes/
     index.ts              Scene registry: SCENES list + RESTART_SCENE_KEY. Register new scenes HERE.
     BootScene.ts          Loads data/assets.ts manifest, creates the 'pixel' texture, starts GameScene.
@@ -29,7 +29,7 @@ src/
     assets.ts             Asset manifest (empty). All art is declared here, never hardcoded paths.
   entities/               (create when needed) Game objects: Arcade Physics sprites + their logic.
   state/                  (create when needed) Run-wide state as plain in-memory modules.
-scripts/check.mjs         Local rabbit-check implementation. DO NOT EDIT.
+node_modules/@rabbit-game-lab/sdk/check/check.mjs         Local rabbit-check implementation. DO NOT EDIT.
 public/assets/            Game art (PNGs). Only files actually used by the game.
 ```
 
@@ -46,9 +46,9 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 
 ## Rules
 
-- **DO NOT EDIT**: `src/main.ts`, `src/rabbit/sdk.ts`, `rabbit.json`, `scripts/check.mjs`, `vite.config.ts`, `package.json` dependencies.
+- **DO NOT EDIT**: `src/main.ts`, `@rabbit-game-lab/sdk`, `rabbit.json`, `node_modules/@rabbit-game-lab/sdk/check/check.mjs`, `vite.config.ts`, `package.json` dependencies.
 - **Run `npm run check` after every change.** If the game breaks in the iframe, the console error is forwarded to you — fix and re-check.
-- **Never use `localStorage`/`sessionStorage` directly** — use `sdk.storage` from `src/rabbit/sdk.ts` (safe in sandboxed iframes).
+- **Never use `localStorage`/`sessionStorage` directly** — use `sdk.storage` from `@rabbit-game-lab/sdk` (safe in sandboxed iframes).
 - Don't hardcode tunable values — add them to `CONFIG` in `game.config.ts`, documented, and import it.
 - Keep files **≤ 400 lines** (enforced by `check`). Split into systems/entities before you hit the limit.
 - The screen is a fixed 800×480 logical resolution (`Scale.FIT`). Don't change `CONFIG.screen.*`.
@@ -67,10 +67,14 @@ public/assets/            Game art (PNGs). Only files actually used by the game.
 4. **Frame the run**: add `MainMenuScene` / `GameOverScene` in `scenes/`, register them in `scenes/index.ts`, update `RESTART_SCENE_KEY`.
 5. **Config-first, always**: every new tunable goes to `game.config.ts` with its documented block at the moment you introduce it — not later.
 
-## SDK 0.8 integration
+## SDK 1.0 integration
 
-Read [docs/rabbit-sdk.md](docs/rabbit-sdk.md) for shared lifecycle, required/optional assets, pointer lock and character switching. `.rabbit-kit.json` records the exact source commit and file hashes. Run `rabbit-kit status --check` from a matching kit checkout; `npm run check` also checks the recorded integrity. Do not edit vendored files or their receipt.
+Read [docs/rabbit-sdk.md](docs/rabbit-sdk.md) for shared lifecycle, required/optional assets, pointer lock and character switching. The exact `@rabbit-game-lab/sdk` dependency and `package-lock.json` pin SDK and checker together. Run `npx rabbit-kit status --check`; `npm run check` validates the installed version and locked SHA-512 integrity. Never edit installed package files.
 
 ## Switching the playable character
 
 Keep one adapter from `createCharacter(existingSprite)` and switch the visual through its handle: `await hero.switchCharacter('loaded-texture-key')` uses an already-loaded Phaser texture; `{ key: 'visitor', path: '/characters/visitor.png', frameWidth: 64, frameHeight: 64 }` loads an image or spritesheet. Set frame dimensions only for spritesheets. `next.animations` (the second argument to `switchCharacter`) maps semantic states such as `idle` and `run` to the target Phaser animation keys. For an already-loaded texture, pass a map such as `{ animations: { idle: 'visitor-idle', run: 'visitor-run' } }`; every switch replaces the old state-to-key map. A `CharacterAsset` descriptor can create its configured animation definitions while it loads. External images need CORS enabled by their host. The adapter keeps the same sprite, display size, origin, Arcade body and velocity, so keep the controller and physics attached to that sprite. A failed or superseded request leaves the current character in place.
+
+## Private npm SDK
+
+`@rabbit-game-lab/sdk@1.0.0` supplies the platform modules and `rabbit-check`. Read [docs/npm-sdk.md](docs/npm-sdk.md) for authentication, import paths and upgrades. SDK sources and API docs are under `node_modules/@rabbit-game-lab/sdk/sdk/` and `node_modules/@rabbit-game-lab/sdk/docs/`; do not edit installed modules.

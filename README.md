@@ -43,4 +43,8 @@ The runtime art is a curated derivative subset of the CC0 **Ninja Adventure Asse
 - Defense, raider, and raid data lives in `src/data/towerDefense.ts`.
 - Core pure rules are in `src/systems/towerDefenseRules.ts` and covered by `npm run test:rules`.
 - Stable source IDs such as `arrow` and `warden` remain unchanged for rules/save compatibility.
-- Rabbit platform wiring remains in `src/main.ts` and `src/rabbit/sdk.ts`.
+- Rabbit platform wiring remains in `src/main.ts` and `@rabbit-game-lab/sdk`.
+
+## Private SDK setup
+
+Authenticate with an npm account that can read `@rabbit-game-lab/sdk`, then run `npm ci`. SDK and checker are pinned together at `1.0.0`. See [setup and upgrades](docs/npm-sdk.md), including the private read access required by CI and Rabbit.

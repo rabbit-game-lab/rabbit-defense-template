@@ -1,12 +1,6 @@
-# Runtime, assets and character replacement (0.8.0)
+# Runtime, assets and character replacement (1.0.0)
 
-The SDK remains vendored per stack. Sync both groups from the same reviewed kit
-commit, then run `rabbit-kit status --check --json`, the template checker, build
-and iframe verification. `.rabbit-kit.json` records the version, Git commit,
-whether that source was dirty, and normalized SHA-256 hashes for each group.
-The local checker rejects drift against this receipt; strict CLI status also
-compares against the kit checkout. A receipt is provenance, not a signature or
-a replacement for reviewing and trusting the source commit.
+The SDK and checker are supplied by the exact private npm dependency `@rabbit-game-lab/sdk@1.0.0`. `package-lock.json` records tarball integrity; `npm ci` verifies the installed artifact. See [npm setup and upgrades](npm-sdk.md).
 
 ## Shared lifecycle
 
@@ -77,7 +71,7 @@ canvas.addEventListener('pointerdown', () => { void pointer.request() })
 
 Request directly in a user gesture. `request()` resolves true only after the
 browser reports the lock; unsupported, denied, timed-out and paused requests
-resolve false. Escape, blur and shared pause release the lock. Recapture needs
+resolve false. Escape and shared pause release the lock; window blur preserves capture. Recapture needs
 another gesture. Declare `embed.pointerLock: true` in authored manifests and
 delegate `allow-pointer-lock` in the host iframe. The adapter cannot grant a
 permission withheld by the embedding page.
