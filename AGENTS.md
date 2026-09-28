@@ -78,3 +78,7 @@ Keep one adapter from `createCharacter(existingSprite)` and switch the visual th
 ## Private npm SDK
 
 `@rabbit-game-lab/sdk@1.0.0` supplies the platform modules and `rabbit-check`. Read [docs/npm-sdk.md](docs/npm-sdk.md) for authentication, import paths and upgrades. SDK sources and API docs are under `node_modules/@rabbit-game-lab/sdk/sdk/` and `node_modules/@rabbit-game-lab/sdk/docs/`; do not edit installed modules.
+
+## GLB discovery from the npm package
+
+`npm run check` inventories GLBs under `public/`; `npx rabbit-kit inspect-model <file-or-directory> --json` inspects other asset paths. Read [the discovery guide](docs/glb-animation-discovery.md). PlayCanvas characters discover clips automatically when `animations` and `clips` are omitted. Use a model `animationMap` only for exceptions and inspect `hero.animations()` for ambiguous or unused clips. `spawnObject` or `animate: false` keeps props static; no skeleton is required for authored animation. Phaser sprites retain their image/spritesheet manifest workflow.

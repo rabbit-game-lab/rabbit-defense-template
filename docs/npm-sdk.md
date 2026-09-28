@@ -40,4 +40,4 @@ Replace `1.0.0` with the target version for an upgrade or rollback. Run the temp
 
 ## Rollout prerequisites
 
-Before merging or importing this migration, Rabbit API's Contract Gate must accept package-based SDK layouts. CI, the template worker's Vercel Sandbox and Studio cold boots from Starter Files need private read access during installation. A Railway environment variable alone does not pass credentials into Sandbox. Keep credentials out of source archives, Starter Files, logs, agent environments and snapshots. Verify a fresh cold boot before publication.
+Before merging or importing this migration, Rabbit API's Contract Gate must accept package-based SDK layouts. CI, standalone Vercel preview/build installs, the template worker's Vercel Sandbox and Studio cold boots from Starter Files need private read access during installation. A Railway environment variable alone does not pass credentials into Sandbox. Keep credentials out of source archives, Starter Files, logs, agent environments and snapshots. Verify a fresh cold boot before publication.

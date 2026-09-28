@@ -65,7 +65,8 @@ without installing another message listener.
 ```ts
 const pointer = createPointerLock(canvas, { onChange: updateCursorHint })
 canvas.addEventListener('pointerdown', () => { void pointer.request() })
-// Use pointer.locked() for relative movement; retain drag/touch while unlocked.
+// Use pointer.locked() / document.pointerLockElement for relative mouse look.
+// Do not add hover-look or drag-look while unlocked. Touch can keep its own path.
 // On application teardown: pointer.destroy()
 ```
 
@@ -78,12 +79,16 @@ permission withheld by the embedding page.
 
 ## PlayCanvas character switching
 
+GLB clips are now discovered automatically when animation configuration is
+omitted. Read [automatic animation discovery](glb-animation-discovery.md) for
+available/enabled inventories, per-model semantic maps and migration notes.
+
 ```ts
 const hero = spawnCharacter(assets, 'hero', { scale: 1 })
 hero.play('run')
 await hero.switchCharacter('anotherLoadedModel')
 await hero.switchCharacter({
-  key: 'visitor', path: 'https://assets.example.org/visitor.glb', animations: 'auto',
+  key: 'visitor', path: 'https://assets.example.org/visitor.glb',
 }, { scale: 0.8, rotation: [0, 180, 0] })
 ```
 
