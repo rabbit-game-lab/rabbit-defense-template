@@ -7,7 +7,7 @@
  * Register new scenes in `src/scenes/index.ts` — never here.
  */
 import Phaser from 'phaser'
-import * as sdk from './rabbit/sdk'
+import * as sdk from '@rabbit-game-lab/sdk'
 import { CONFIG } from './game.config'
 import { setMuted } from './systems/audioManager'
 import { RESTART_SCENE_KEY, SCENES } from './scenes'

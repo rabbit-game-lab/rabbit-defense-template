@@ -1,4 +1,4 @@
-import * as sdk from '../rabbit/sdk.js'
+import * as sdk from '@rabbit-game-lab/sdk'
 import {
   ACCESSIBILITY_SETTINGS_STORAGE_KEY,
   type AccessibilitySettings,

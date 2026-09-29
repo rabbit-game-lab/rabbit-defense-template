@@ -1,4 +1,4 @@
-import * as sdk from '../rabbit/sdk'
+import * as sdk from '@rabbit-game-lab/sdk'
 import {
   PROFILE_SCHEMA_VERSION,
   PROFILE_STORAGE_KEY,
