@@ -31,6 +31,7 @@ Install the reviewed exact version, then commit both manifests:
 
 ```sh
 npm install --save-exact @rabbit-game-lab/sdk@1.0.0
+npx rabbit-kit sync-docs   # SDK releases after 1.0.1: refresh docs/sdk-reference/
 npm exec -- rabbit-kit status --check
 npm run check
 npm run build
