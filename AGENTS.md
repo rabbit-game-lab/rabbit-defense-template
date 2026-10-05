@@ -2,6 +2,8 @@
 
 This is the **Rabbit Defense game template**, built with **Phaser 3 (Arcade Physics) + Vite + TypeScript**. Extend the existing gameplay through its scenes, entities, systems and configuration. Boot, the iframe handshake and the npm SDK are maintained through the canonical platform workflow.
 
+**Rabbit SDK reference:** read [`docs/sdk-reference/README.md`](docs/sdk-reference/README.md) before writing input, touch, audio, pause, asset, character, physics or camera code. It is generated from the pinned `@rabbit-game-lab/sdk` and committed, so it is readable without `node_modules`: module import paths, typical requests and public API. Never edit it; `npx rabbit-kit sync-docs` regenerates it after an SDK upgrade.
+
 ## Commands
 
 | Command | What it does |
