@@ -47,4 +47,4 @@ The runtime art is a curated derivative subset of the CC0 **Ninja Adventure Asse
 
 ## Private SDK setup
 
-Authenticate with an npm account that can read `@rabbit-game-lab/sdk`, then run `npm ci`. SDK and checker are pinned together at `1.0.0`. See [setup and upgrades](docs/npm-sdk.md), including the private read access required by CI and Rabbit.
+Authenticate with an npm account that can read `@rabbit-game-lab/sdk`, then run `npm ci`. SDK and checker are pinned together at `1.1.0`. See [setup and upgrades](docs/npm-sdk.md), including the private read access required by CI and Rabbit.

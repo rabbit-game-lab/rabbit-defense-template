@@ -1,6 +1,6 @@
 # Private npm SDK
 
-This template pins `@rabbit-game-lab/sdk` at exactly `1.0.0`. The package supplies shared runtime modules, engine adapters and the `rabbit-check` executable. No SDK source is copied into the template.
+This template pins `@rabbit-game-lab/sdk` at exactly `1.1.0`. The package supplies shared runtime modules, engine adapters and the `rabbit-check` executable. No SDK source is copied into the template.
 
 ## Install
 
@@ -30,14 +30,14 @@ The package's `docs/`, `sdk/` and `dist/` contain API documentation, readable so
 Install the reviewed exact version, then commit both manifests:
 
 ```sh
-npm install --save-exact @rabbit-game-lab/sdk@1.0.0
-npx rabbit-kit sync-docs   # SDK releases after 1.0.1: refresh docs/sdk-reference/
+npm install --save-exact @rabbit-game-lab/sdk@1.1.0
+npx rabbit-kit sync-docs   # refresh docs/sdk-reference/
 npm exec -- rabbit-kit status --check
 npm run check
 npm run build
 ```
 
-Replace `1.0.0` with the target version for an upgrade or rollback. Run the template's tests and canonical iframe harness before review. `npm ci` verifies tarball integrity; `rabbit-check` requires an exact dependency and matching lockfile/installed version. Existing Studio projects retain their immutable template version.
+Replace `1.1.0` with the target version for an upgrade or rollback. Run the template's tests and canonical iframe harness before review. `npm ci` verifies tarball integrity; `rabbit-check` requires an exact dependency and matching lockfile/installed version. Existing Studio projects retain their immutable template version.
 
 ## Rollout prerequisites
 

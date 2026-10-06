@@ -79,7 +79,7 @@ Keep one adapter from `createCharacter(existingSprite)` and switch the visual th
 
 ## Private npm SDK
 
-`@rabbit-game-lab/sdk@1.0.0` supplies the platform modules and `rabbit-check`. Read [docs/npm-sdk.md](docs/npm-sdk.md) for authentication, import paths and upgrades. SDK sources and API docs are under `node_modules/@rabbit-game-lab/sdk/sdk/` and `node_modules/@rabbit-game-lab/sdk/docs/`; do not edit installed modules.
+`@rabbit-game-lab/sdk@1.1.0` supplies the platform modules and `rabbit-check`. Read [docs/npm-sdk.md](docs/npm-sdk.md) for authentication, import paths and upgrades. SDK sources and API docs are under `node_modules/@rabbit-game-lab/sdk/sdk/` and `node_modules/@rabbit-game-lab/sdk/docs/`; do not edit installed modules.
 
 ## GLB discovery from the npm package
 
