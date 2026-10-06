@@ -1,6 +1,6 @@
 # Runtime, assets and character replacement (1.0.0)
 
-The SDK and checker are supplied by the exact private npm dependency `@rabbit-game-lab/sdk@1.0.0`. `package-lock.json` records tarball integrity; `npm ci` verifies the installed artifact. See [npm setup and upgrades](npm-sdk.md).
+The SDK and checker are supplied by the exact private npm dependency `@rabbit-game-lab/sdk@1.1.0`. `package-lock.json` records tarball integrity; `npm ci` verifies the installed artifact. See [npm setup and upgrades](npm-sdk.md).
 
 ## Shared lifecycle
 
